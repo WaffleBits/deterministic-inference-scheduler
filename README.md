@@ -1,0 +1,89 @@
+# Rust Inference Runtime
+
+[![CI](https://github.com/WaffleBits/rust-inference-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/WaffleBits/rust-inference-runtime/actions/workflows/ci.yml)
+
+A deterministic, accelerator-agnostic inference runtime core written in Rust.
+The repository focuses on continuous-batching policy, paged KV-cache admission,
+replayable scheduling traces, and canary/shadow release decisions.
+
+## What It Demonstrates
+
+- Performance-sensitive Rust with explicit ownership of queue and memory state.
+- Priority-aware admission with stable ordering and bounded prefill work.
+- Conservative paged-KV reservations that prevent admitted requests from
+  exceeding declared capacity.
+- Round-robin decode scheduling so active requests make measurable progress.
+- Deterministic workload replay with a machine-readable trace fingerprint.
+- Baseline/candidate release validation with `promote`, `hold`, and `rollback`
+  outcomes.
+- Exact output checks, error-rate deltas, p95 latency regression policy, tests,
+  and CI.
+
+## Quick Start
+
+```bash
+cargo test --all-targets
+
+cargo run --release -- replay \
+  --input fixtures/workload.json \
+  --output artifacts/workload-replay.json
+
+cargo run --release -- gate \
+  --input fixtures/release_gate_safe.json \
+  --output artifacts/release-gate-promote.json
+
+cargo run --release -- gate \
+  --input fixtures/release_gate_bad.json \
+  --output artifacts/release-gate-rollback.json
+```
+
+The safe fixture produces `promote`. The candidate with an output mismatch and
+an added error produces `rollback`.
+
+The checked workload fixture completes four requests in 11 scheduler ticks,
+peaks at 12 of 20 KV pages, returns all pages on completion, and emits trace
+fingerprint `394166dc24d38b6c`.
+
+## Runtime Model
+
+Each request declares prompt length, maximum output length, priority, and
+arrival tick. Admission reserves paged KV capacity for the declared maximum
+context, applies a per-tick prefill budget, and avoids strict head-of-line
+blocking when a large request cannot fit. Active requests decode in round-robin
+order with a configurable batch width.
+
+Every tick records:
+
+- admitted request IDs;
+- decoded and completed request IDs;
+- queued and active counts; and
+- used KV pages.
+
+The replay report includes a stable trace fingerprint, peak KV pages, total
+ticks, and completion count.
+
+## Release Policy
+
+The gate joins mirrored baseline and candidate observations by request ID.
+
+| Signal | Response |
+|---|---|
+| Output mismatch above policy | `rollback` |
+| Error-rate increase above policy | `rollback` |
+| p95 latency regression above policy | `hold` |
+| Missing or insufficient matched traffic | `hold` |
+| Complete evidence within policy | `promote` |
+
+See [Release Validation](docs/RELEASE_VALIDATION.md) for extension points such
+as model-aware numeric tolerances, segmented SLO checks, and audited rollout
+integration.
+
+## Design Boundaries
+
+This repository is a focused runtime and validation artifact, not a claim of
+production fleet scale. It does not execute model kernels, coordinate multiple
+hosts, or manage real deployment traffic. The interfaces are intentionally
+small enough to review and extend toward accelerator backends, distributed
+coordination, shadow traffic, and Kubernetes job scheduling.
+
+See [Architecture](docs/ARCHITECTURE.md) for invariants and tradeoffs.

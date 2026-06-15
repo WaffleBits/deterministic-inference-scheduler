@@ -1,0 +1,21 @@
+{
+  "thresholds": {
+    "min_matched_requests": 4,
+    "max_output_mismatch_rate": 0.0,
+    "max_error_rate_increase": 0.01,
+    "max_p95_latency_regression_pct": 10.0
+  },
+  "baseline": [
+    {"request_id": "a", "output_fingerprint": "8a1", "latency_ms": 10.0, "ok": true},
+    {"request_id": "b", "output_fingerprint": "8b2", "latency_ms": 12.0, "ok": true},
+    {"request_id": "c", "output_fingerprint": "8c3", "latency_ms": 14.0, "ok": true},
+    {"request_id": "d", "output_fingerprint": "8d4", "latency_ms": 16.0, "ok": true}
+  ],
+  "candidate": [
+    {"request_id": "a", "output_fingerprint": "8a1", "latency_ms": 10.4, "ok": true},
+    {"request_id": "b", "output_fingerprint": "changed", "latency_ms": 12.3, "ok": true},
+    {"request_id": "c", "output_fingerprint": "8c3", "latency_ms": 14.5, "ok": true},
+    {"request_id": "d", "output_fingerprint": "", "latency_ms": 16.7, "ok": false}
+  ]
+}
+

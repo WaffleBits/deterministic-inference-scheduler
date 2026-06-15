@@ -1,0 +1,40 @@
+{
+  "config": {
+    "max_active_requests": 3,
+    "decode_batch_size": 2,
+    "max_prefill_tokens_per_tick": 96,
+    "kv_page_tokens": 16,
+    "total_kv_pages": 20
+  },
+  "requests": [
+    {
+      "id": "interactive-001",
+      "prompt_tokens": 32,
+      "max_output_tokens": 4,
+      "priority": 5,
+      "arrival_tick": 0
+    },
+    {
+      "id": "batch-001",
+      "prompt_tokens": 64,
+      "max_output_tokens": 6,
+      "priority": 1,
+      "arrival_tick": 0
+    },
+    {
+      "id": "interactive-002",
+      "prompt_tokens": 48,
+      "max_output_tokens": 3,
+      "priority": 5,
+      "arrival_tick": 1
+    },
+    {
+      "id": "batch-002",
+      "prompt_tokens": 80,
+      "max_output_tokens": 5,
+      "priority": 1,
+      "arrival_tick": 2
+    }
+  ]
+}
+
