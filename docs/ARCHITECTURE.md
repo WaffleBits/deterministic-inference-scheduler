@@ -36,15 +36,17 @@ It computes:
 
 - request coverage;
 - exact output-fingerprint mismatch rate;
+- model/backend-scoped numeric drift when fingerprints differ;
 - error-rate increase;
 - successful-request p95 latency; and
-- candidate p95 regression.
+- candidate p95 regression; and
+- segment summaries by model, baseline backend, candidate backend, and
+  accelerator.
 
-Correctness or reliability regressions produce `rollback`. Latency regressions
-or incomplete evidence produce `hold`. A complete candidate within policy
-produces `promote`.
+Correctness, numeric drift, or reliability regressions produce `rollback`.
+Latency regressions or incomplete evidence produce `hold`. A complete candidate
+within policy produces `promote`.
 
 This is a local validation component, not a deployment controller. Production
 integration would obtain observations from mirrored traffic, canary
 populations, telemetry, and an audited rollout system.
-

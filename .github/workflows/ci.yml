@@ -28,4 +28,4 @@ jobs:
         run: |
           cargo run --release -- gate --input fixtures/release_gate_safe.json --output target/release-gate-promote.json
           cargo run --release -- gate --input fixtures/release_gate_bad.json --output target/release-gate-rollback.json
-
+          cargo run --release -- gate --input fixtures/release_gate_numeric_tolerance.json --output target/release-gate-numeric-tolerance.json
