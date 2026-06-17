@@ -1,17 +1,37 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "decision": "rollback",
   "matched_requests": 4,
   "baseline_requests": 4,
   "candidate_requests": 4,
   "coverage_rate": 1.0,
   "output_mismatch_rate": 0.333333,
+  "numeric_pairs": 0,
+  "tolerated_numeric_outputs": 0,
+  "numeric_drift_rate": 0.0,
+  "max_numeric_abs_error": null,
+  "max_numeric_rel_error": null,
   "baseline_error_rate": 0.0,
   "candidate_error_rate": 0.25,
   "error_rate_increase": 0.25,
   "baseline_p95_latency_ms": 16.0,
   "candidate_p95_latency_ms": 14.5,
   "p95_latency_regression_pct": -9.375,
+  "segments": [
+    {
+      "model": "unspecified",
+      "baseline_backend": "unspecified",
+      "candidate_backend": "unspecified",
+      "accelerator": "unspecified",
+      "matched_requests": 4,
+      "output_mismatch_rate": 0.333333,
+      "baseline_error_rate": 0.0,
+      "candidate_error_rate": 0.25,
+      "baseline_p95_latency_ms": 16.0,
+      "candidate_p95_latency_ms": 14.5,
+      "p95_latency_regression_pct": -9.375
+    }
+  ],
   "reasons": [
     "output mismatch rate 0.3333 exceeded 0.0000",
     "error-rate increase 0.2500 exceeded 0.0100"

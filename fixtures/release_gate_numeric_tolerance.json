@@ -1,0 +1,102 @@
+{
+  "thresholds": {
+    "min_matched_requests": 4,
+    "max_output_mismatch_rate": 0.0,
+    "max_error_rate_increase": 0.01,
+    "max_p95_latency_regression_pct": 10.0,
+    "max_numeric_drift_rate": 0.0,
+    "numeric_tolerances": [
+      {
+        "model": "decoder-7b",
+        "candidate_backend": "candidate-runtime",
+        "candidate_accelerator": "h100",
+        "max_abs_error": 0.002,
+        "max_rel_error": 0.01
+      }
+    ]
+  },
+  "baseline": [
+    {
+      "request_id": "prompt-a",
+      "output_fingerprint": "baseline-a",
+      "latency_ms": 18.0,
+      "ok": true,
+      "model": "decoder-7b",
+      "backend": "baseline-runtime",
+      "accelerator": "h100",
+      "output_values": [0.125, 0.5, 1.25]
+    },
+    {
+      "request_id": "prompt-b",
+      "output_fingerprint": "baseline-b",
+      "latency_ms": 21.0,
+      "ok": true,
+      "model": "decoder-7b",
+      "backend": "baseline-runtime",
+      "accelerator": "h100",
+      "output_values": [0.25, 0.75, 1.5]
+    },
+    {
+      "request_id": "prompt-c",
+      "output_fingerprint": "baseline-c",
+      "latency_ms": 25.0,
+      "ok": true,
+      "model": "decoder-7b",
+      "backend": "baseline-runtime",
+      "accelerator": "h100",
+      "output_values": [0.375, 1.0, 1.75]
+    },
+    {
+      "request_id": "prompt-d",
+      "output_fingerprint": "baseline-d",
+      "latency_ms": 28.0,
+      "ok": true,
+      "model": "decoder-7b",
+      "backend": "baseline-runtime",
+      "accelerator": "h100",
+      "output_values": [0.5, 1.25, 2.0]
+    }
+  ],
+  "candidate": [
+    {
+      "request_id": "prompt-a",
+      "output_fingerprint": "candidate-a",
+      "latency_ms": 18.2,
+      "ok": true,
+      "model": "decoder-7b",
+      "backend": "candidate-runtime",
+      "accelerator": "h100",
+      "output_values": [0.126, 0.501, 1.251]
+    },
+    {
+      "request_id": "prompt-b",
+      "output_fingerprint": "candidate-b",
+      "latency_ms": 20.8,
+      "ok": true,
+      "model": "decoder-7b",
+      "backend": "candidate-runtime",
+      "accelerator": "h100",
+      "output_values": [0.251, 0.751, 1.501]
+    },
+    {
+      "request_id": "prompt-c",
+      "output_fingerprint": "candidate-c",
+      "latency_ms": 24.4,
+      "ok": true,
+      "model": "decoder-7b",
+      "backend": "candidate-runtime",
+      "accelerator": "h100",
+      "output_values": [0.376, 1.001, 1.751]
+    },
+    {
+      "request_id": "prompt-d",
+      "output_fingerprint": "candidate-d",
+      "latency_ms": 27.6,
+      "ok": true,
+      "model": "decoder-7b",
+      "backend": "candidate-runtime",
+      "accelerator": "h100",
+      "output_values": [0.501, 1.251, 2.001]
+    }
+  ]
+}
