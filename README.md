@@ -16,8 +16,9 @@ replayable scheduling traces, and canary/shadow release decisions.
 - Deterministic workload replay with a machine-readable trace fingerprint.
 - Baseline/candidate release validation with `promote`, `hold`, and `rollback`
   outcomes.
-- Exact output checks, error-rate deltas, p95 latency regression policy, tests,
-  and CI.
+- Exact output checks, model-aware numeric tolerances for backend drift,
+  per-segment release summaries, error-rate deltas, p95 latency regression
+  policy, tests, and CI.
 
 ## Quick Start
 
@@ -35,10 +36,16 @@ cargo run --release -- gate \
 cargo run --release -- gate \
   --input fixtures/release_gate_bad.json \
   --output artifacts/release-gate-rollback.json
+
+cargo run --release -- gate \
+  --input fixtures/release_gate_numeric_tolerance.json \
+  --output artifacts/release-gate-numeric-tolerance.json
 ```
 
 The safe fixture produces `promote`. The candidate with an output mismatch and
 an added error produces `rollback`.
+The numeric-tolerance fixture produces `promote` while reporting four tolerated
+numeric comparisons across a baseline-runtime to candidate-runtime segment.
 
 The checked workload fixture completes four requests in 11 scheduler ticks,
 peaks at 12 of 20 KV pages, returns all pages on completion, and emits trace
@@ -65,10 +72,15 @@ ticks, and completion count.
 ## Release Policy
 
 The gate joins mirrored baseline and candidate observations by request ID.
+Outputs can be validated either by exact fingerprint or by a configured
+numeric tolerance scoped to model, candidate backend, and accelerator. Reports
+include aggregate metrics plus segment summaries so hardware/backend-specific
+regressions remain visible.
 
 | Signal | Response |
 |---|---|
 | Output mismatch above policy | `rollback` |
+| Numeric drift above model/backend policy | `rollback` |
 | Error-rate increase above policy | `rollback` |
 | p95 latency regression above policy | `hold` |
 | Missing or insufficient matched traffic | `hold` |
