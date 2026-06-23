@@ -50,3 +50,17 @@ within policy produces `promote`.
 This is a local validation component, not a deployment controller. Production
 integration would obtain observations from mirrored traffic, canary
 populations, telemetry, and an audited rollout system.
+
+## Backend Mirror Adapter
+
+The adapter sits before the release gate. It normalizes backend-specific
+mirrored observations into `GateInput` without changing the gate policy. This
+keeps ingestion concerns separate from rollout decisions.
+
+The adapter currently accepts compact vLLM/SGLang-style request summaries:
+request ID, latency, health, model, backend, accelerator, output token IDs,
+optional explicit fingerprints, and optional numeric vectors. If an engine does
+not provide a fingerprint, the adapter computes a stable FNV-1a fingerprint
+from token IDs or numeric values. Successful observations without output
+material are rejected so a candidate cannot be promoted from latency-only
+evidence.
