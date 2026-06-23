@@ -16,6 +16,8 @@ replayable scheduling traces, and canary/shadow release decisions.
 - Deterministic workload replay with a machine-readable trace fingerprint.
 - Baseline/candidate release validation with `promote`, `hold`, and `rollback`
   outcomes.
+- Backend mirror normalization for vLLM/SGLang-style serving observations
+  before the release gate runs.
 - Exact output checks, model-aware numeric tolerances for backend drift,
   per-segment release summaries, error-rate deltas, p95 latency regression
   policy, tests, and CI.
@@ -40,12 +42,18 @@ cargo run --release -- gate \
 cargo run --release -- gate \
   --input fixtures/release_gate_numeric_tolerance.json \
   --output artifacts/release-gate-numeric-tolerance.json
+
+cargo run --release -- mirror-gate \
+  --input fixtures/backend_mirror_vllm_sglang.json \
+  --output artifacts/backend-mirror-report.json
 ```
 
 The safe fixture produces `promote`. The candidate with an output mismatch and
 an added error produces `rollback`.
 The numeric-tolerance fixture produces `promote` while reporting four tolerated
 numeric comparisons across a baseline-runtime to candidate-runtime segment.
+The backend-mirror fixture converts vLLM/SGLang-style request observations into
+the same release gate and produces `promote` with a vLLM to SGLang segment.
 
 The checked workload fixture completes four requests in 11 scheduler ticks,
 peaks at 12 of 20 KV pages, returns all pages on completion, and emits trace
@@ -68,6 +76,18 @@ Every tick records:
 
 The replay report includes a stable trace fingerprint, peak KV pages, total
 ticks, and completion count.
+
+## Backend Mirror Adapter
+
+`runtime-lab mirror` converts backend-specific mirrored observations into a
+gate input. `runtime-lab mirror-gate` performs the conversion and immediately
+evaluates the release policy.
+
+The adapter accepts per-request latency, health, model, backend, accelerator,
+output token IDs, explicit output fingerprints, and optional numeric output
+vectors. Successful observations must carry output material so correctness
+checks remain auditable. Token IDs and numeric vectors are converted into
+stable FNV-1a fingerprints when an engine-specific fingerprint is not supplied.
 
 ## Release Policy
 

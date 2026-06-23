@@ -1,0 +1,38 @@
+{
+  "schema_version": 2,
+  "decision": "promote",
+  "matched_requests": 4,
+  "baseline_requests": 4,
+  "candidate_requests": 4,
+  "coverage_rate": 1.0,
+  "output_mismatch_rate": 0.0,
+  "numeric_pairs": 0,
+  "tolerated_numeric_outputs": 0,
+  "numeric_drift_rate": 0.0,
+  "max_numeric_abs_error": null,
+  "max_numeric_rel_error": null,
+  "baseline_error_rate": 0.0,
+  "candidate_error_rate": 0.0,
+  "error_rate_increase": 0.0,
+  "baseline_p95_latency_ms": 28.0,
+  "candidate_p95_latency_ms": 27.2,
+  "p95_latency_regression_pct": -2.857143,
+  "segments": [
+    {
+      "model": "decoder-7b",
+      "baseline_backend": "vllm",
+      "candidate_backend": "sglang",
+      "accelerator": "h100",
+      "matched_requests": 4,
+      "output_mismatch_rate": 0.0,
+      "baseline_error_rate": 0.0,
+      "candidate_error_rate": 0.0,
+      "baseline_p95_latency_ms": 28.0,
+      "candidate_p95_latency_ms": 27.2,
+      "p95_latency_regression_pct": -2.857143
+    }
+  ],
+  "reasons": [
+    "candidate stayed within correctness, reliability, and latency policy"
+  ]
+}

@@ -3,7 +3,9 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use rust_inference_runtime::{GateInput, ReplayInput, evaluate_release, run_replay};
+use rust_inference_runtime::{
+    BackendMirrorInput, GateInput, ReplayInput, evaluate_release, mirror_to_gate_input, run_replay,
+};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
@@ -26,6 +28,15 @@ fn run() -> Result<(), Box<dyn Error>> {
         }
         "gate" => {
             let gate_input: GateInput = read_json(&input)?;
+            write_json(&output, &evaluate_release(&gate_input))?;
+        }
+        "mirror" => {
+            let mirror_input: BackendMirrorInput = read_json(&input)?;
+            write_json(&output, &mirror_to_gate_input(&mirror_input)?)?;
+        }
+        "mirror-gate" => {
+            let mirror_input: BackendMirrorInput = read_json(&input)?;
+            let gate_input = mirror_to_gate_input(&mirror_input)?;
             write_json(&output, &evaluate_release(&gate_input))?;
         }
         _ => return Err(usage().into()),
@@ -73,5 +84,5 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<(), Box<dyn Error>>
 }
 
 fn usage() -> String {
-    "usage: runtime-lab <replay|gate> --input <path> --output <path>".into()
+    "usage: runtime-lab <replay|gate|mirror|mirror-gate> --input <path> --output <path>".into()
 }
