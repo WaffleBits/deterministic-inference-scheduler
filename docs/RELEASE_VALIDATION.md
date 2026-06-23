@@ -45,6 +45,20 @@ The report includes:
 - segment summaries by model, baseline backend, candidate backend, and
   accelerator.
 
+## Backend Mirror Adapter
+
+The `mirror` command normalizes request observations from backend-specific
+serving traces into the release gate input format. It is intended for mirrored
+baseline/candidate comparisons such as vLLM versus SGLang, or a current
+runtime versus a candidate runtime behind shadow traffic.
+
+Each observation records request ID, latency, health, model, backend,
+accelerator, and output material. Engines may provide their own
+`output_fingerprint`; otherwise the adapter hashes output token IDs or numeric
+output vectors with a stable FNV-1a fingerprint. Successful observations
+without output material are rejected because the release gate cannot audit
+correctness from latency alone.
+
 ## Production Extension Points
 
 A real rollout system should add:

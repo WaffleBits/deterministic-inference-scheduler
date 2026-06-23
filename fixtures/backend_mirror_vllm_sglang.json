@@ -1,0 +1,72 @@
+{
+  "thresholds": {
+    "min_matched_requests": 4,
+    "max_output_mismatch_rate": 0.0,
+    "max_error_rate_increase": 0.01,
+    "max_p95_latency_regression_pct": 10.0,
+    "max_numeric_drift_rate": 0.0,
+    "numeric_tolerances": []
+  },
+  "baseline": {
+    "backend": "vllm",
+    "model": "decoder-7b",
+    "accelerator": "h100",
+    "observations": [
+      {
+        "request_id": "prompt-a",
+        "latency_ms": 18.0,
+        "ok": true,
+        "output_token_ids": [101, 1402, 13]
+      },
+      {
+        "request_id": "prompt-b",
+        "latency_ms": 21.0,
+        "ok": true,
+        "output_token_ids": [205, 778, 990]
+      },
+      {
+        "request_id": "prompt-c",
+        "latency_ms": 24.0,
+        "ok": true,
+        "output_token_ids": [42, 42, 7]
+      },
+      {
+        "request_id": "prompt-d",
+        "latency_ms": 28.0,
+        "ok": true,
+        "output_token_ids": [301, 302, 303, 2]
+      }
+    ]
+  },
+  "candidate": {
+    "backend": "sglang",
+    "model": "decoder-7b",
+    "accelerator": "h100",
+    "observations": [
+      {
+        "request_id": "prompt-a",
+        "latency_ms": 17.5,
+        "ok": true,
+        "output_token_ids": [101, 1402, 13]
+      },
+      {
+        "request_id": "prompt-b",
+        "latency_ms": 20.6,
+        "ok": true,
+        "output_token_ids": [205, 778, 990]
+      },
+      {
+        "request_id": "prompt-c",
+        "latency_ms": 23.5,
+        "ok": true,
+        "output_token_ids": [42, 42, 7]
+      },
+      {
+        "request_id": "prompt-d",
+        "latency_ms": 27.2,
+        "ok": true,
+        "output_token_ids": [301, 302, 303, 2]
+      }
+    ]
+  }
+}
