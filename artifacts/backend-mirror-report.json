@@ -17,22 +17,44 @@
   "baseline_p95_latency_ms": 28.0,
   "candidate_p95_latency_ms": 27.2,
   "p95_latency_regression_pct": -2.857143,
+  "baseline_p95_ttft_ms": 9.0,
+  "candidate_p95_ttft_ms": 8.5,
+  "ttft_regression_pct": -5.555556,
+  "baseline_decode_token_p95_ms": 7.5,
+  "candidate_decode_token_p95_ms": 7.0,
+  "decode_token_p95_regression_pct": -6.666667,
+  "max_candidate_queue_depth": 6,
+  "max_candidate_memory_pressure_pct": 60.0,
+  "token_trace_pairs": 4,
+  "token_trace_mismatch_rate": 0.0,
   "segments": [
     {
       "model": "decoder-7b",
       "baseline_backend": "vllm",
       "candidate_backend": "sglang",
       "accelerator": "h100",
+      "baseline_model_version": "decoder-7b@baseline-2026-06-24",
+      "candidate_model_version": "decoder-7b@candidate-2026-06-24",
       "matched_requests": 4,
       "output_mismatch_rate": 0.0,
       "baseline_error_rate": 0.0,
       "candidate_error_rate": 0.0,
       "baseline_p95_latency_ms": 28.0,
       "candidate_p95_latency_ms": 27.2,
-      "p95_latency_regression_pct": -2.857143
+      "p95_latency_regression_pct": -2.857143,
+      "baseline_p95_ttft_ms": 9.0,
+      "candidate_p95_ttft_ms": 8.5,
+      "ttft_regression_pct": -5.555556,
+      "baseline_decode_token_p95_ms": 7.5,
+      "candidate_decode_token_p95_ms": 7.0,
+      "decode_token_p95_regression_pct": -6.666667,
+      "max_candidate_queue_depth": 6,
+      "max_candidate_memory_pressure_pct": 60.0,
+      "token_trace_pairs": 4,
+      "token_trace_mismatch_rate": 0.0
     }
   ],
   "reasons": [
-    "candidate stayed within correctness, reliability, and latency policy"
+    "candidate stayed within correctness, reliability, latency, and telemetry policy"
   ]
 }

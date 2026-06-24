@@ -3,7 +3,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::release::{GateInput, GateThresholds, Observation};
+use crate::release::{GateInput, GateThresholds, Observation, OperationalTelemetry};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BackendMirrorInput {
@@ -36,6 +36,20 @@ pub struct BackendObservation {
     pub output_values: Option<Vec<f64>>,
     #[serde(default)]
     pub error: Option<String>,
+    #[serde(default)]
+    pub model_version: Option<String>,
+    #[serde(default)]
+    pub queue_depth: Option<usize>,
+    #[serde(default)]
+    pub kv_pages_used: Option<usize>,
+    #[serde(default)]
+    pub kv_pages_capacity: Option<usize>,
+    #[serde(default)]
+    pub time_to_first_token_ms: Option<f64>,
+    #[serde(default)]
+    pub decode_token_latencies_ms: Vec<f64>,
+    #[serde(default)]
+    pub token_trace_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,6 +108,7 @@ fn normalize_observation(
             observation.request_id
         )));
     }
+    validate_operational_telemetry(observation)?;
 
     let ok = observation.ok.unwrap_or_else(|| {
         observation
@@ -112,7 +127,69 @@ fn normalize_observation(
         backend: Some(set.backend.clone()),
         accelerator: set.accelerator.clone(),
         output_values: observation.output_values.clone(),
+        telemetry: operational_telemetry(observation),
     })
+}
+
+fn validate_operational_telemetry(observation: &BackendObservation) -> Result<(), AdapterError> {
+    if let Some(ttft) = observation.time_to_first_token_ms
+        && (!ttft.is_finite() || ttft < 0.0)
+    {
+        return Err(AdapterError::new(format!(
+            "request {} has invalid time_to_first_token_ms",
+            observation.request_id
+        )));
+    }
+
+    for latency in &observation.decode_token_latencies_ms {
+        if !latency.is_finite() || *latency < 0.0 {
+            return Err(AdapterError::new(format!(
+                "request {} has invalid decode_token_latencies_ms",
+                observation.request_id
+            )));
+        }
+    }
+
+    match (observation.kv_pages_used, observation.kv_pages_capacity) {
+        (Some(_), Some(0)) => Err(AdapterError::new(format!(
+            "request {} has kv_pages_capacity of zero",
+            observation.request_id
+        ))),
+        (Some(used), Some(capacity)) if used > capacity => Err(AdapterError::new(format!(
+            "request {} has kv_pages_used greater than kv_pages_capacity",
+            observation.request_id
+        ))),
+        _ => Ok(()),
+    }
+}
+
+fn operational_telemetry(observation: &BackendObservation) -> OperationalTelemetry {
+    OperationalTelemetry {
+        model_version: observation.model_version.clone(),
+        queue_depth: observation.queue_depth,
+        kv_pages_used: observation.kv_pages_used,
+        kv_pages_capacity: observation.kv_pages_capacity,
+        time_to_first_token_ms: observation.time_to_first_token_ms,
+        decode_token_latencies_ms: observation.decode_token_latencies_ms.clone(),
+        token_trace_fingerprint: token_trace_fingerprint(observation),
+    }
+}
+
+fn token_trace_fingerprint(observation: &BackendObservation) -> Option<String> {
+    if let Some(fingerprint) = observation.token_trace_fingerprint.as_ref()
+        && !fingerprint.trim().is_empty()
+    {
+        return Some(fingerprint.clone());
+    }
+
+    if observation.output_token_ids.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "token-trace-fnv64:{:016x}",
+            hash_i64_values(&observation.output_token_ids)
+        ))
+    }
 }
 
 fn output_fingerprint(observation: &BackendObservation, ok: bool) -> Result<String, AdapterError> {

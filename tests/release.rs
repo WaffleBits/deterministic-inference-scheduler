@@ -1,5 +1,6 @@
 use rust_inference_runtime::{
-    GateDecision, GateInput, GateThresholds, NumericTolerance, Observation, evaluate_release,
+    GateDecision, GateInput, GateThresholds, NumericTolerance, Observation, OperationalTelemetry,
+    evaluate_release,
 };
 
 fn observation(id: &str, fingerprint: &str, latency_ms: f64, ok: bool) -> Observation {
@@ -12,6 +13,7 @@ fn observation(id: &str, fingerprint: &str, latency_ms: f64, ok: bool) -> Observ
         backend: None,
         accelerator: None,
         output_values: None,
+        telemetry: OperationalTelemetry::default(),
     }
 }
 
@@ -31,6 +33,7 @@ fn numeric_observation(
         backend: Some(backend.into()),
         accelerator: Some("h100".into()),
         output_values: Some(values.to_vec()),
+        telemetry: OperationalTelemetry::default(),
     }
 }
 
@@ -101,6 +104,9 @@ fn promotes_candidate_with_numeric_outputs_inside_model_tolerance() {
             max_output_mismatch_rate: 0.0,
             max_error_rate_increase: 0.01,
             max_p95_latency_regression_pct: 10.0,
+            max_ttft_regression_pct: 10.0,
+            max_decode_token_p95_regression_pct: 10.0,
+            max_candidate_memory_pressure_pct: 95.0,
             max_numeric_drift_rate: 0.0,
             numeric_tolerances: vec![NumericTolerance {
                 model: Some("decoder-7b".into()),
@@ -139,6 +145,9 @@ fn rolls_back_numeric_outputs_outside_model_tolerance() {
             max_output_mismatch_rate: 0.0,
             max_error_rate_increase: 0.01,
             max_p95_latency_regression_pct: 10.0,
+            max_ttft_regression_pct: 10.0,
+            max_decode_token_p95_regression_pct: 10.0,
+            max_candidate_memory_pressure_pct: 95.0,
             max_numeric_drift_rate: 0.0,
             numeric_tolerances: vec![NumericTolerance {
                 model: Some("decoder-7b".into()),

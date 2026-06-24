@@ -10,13 +10,17 @@ Use `promote` when:
 - output fingerprints stay within the configured mismatch budget;
 - configured numeric tolerances cover any expected model/backend output drift;
 - the candidate error-rate increase stays within policy; and
-- candidate p95 latency stays within the configured regression budget.
+- candidate p95 latency, TTFT p95, decode-token p95, and KV memory pressure
+  stay within the configured regression budgets.
 
 ## Hold
 
 Use `hold` when the evidence is incomplete or performance needs investigation.
 Examples include missing shadow requests, too few matched samples, no successful
 output pairs, or a p95 latency regression without a correctness failure.
+The same response is used for excessive TTFT regression, decode-token p95
+regression, or candidate KV memory pressure because those are operational
+signals that need investigation before rollout.
 
 ## Rollback
 
@@ -45,6 +49,23 @@ The report includes:
 - segment summaries by model, baseline backend, candidate backend, and
   accelerator.
 
+## Operational Telemetry
+
+Mirrored observations can include rollout context and token-path telemetry:
+
+- model version;
+- queue depth;
+- KV pages used and available;
+- time to first token;
+- per-token decode latencies; and
+- token-trace fingerprints.
+
+The gate reports aggregate and per-segment TTFT p95, decode-token p95, maximum
+candidate queue depth, maximum candidate memory pressure, and token-trace
+mismatch rate. Correct outputs with excessive latency or memory pressure produce
+`hold`, not `rollback`, because the evidence points to performance or capacity
+risk rather than a correctness failure.
+
 ## Backend Mirror Adapter
 
 The `mirror` command normalizes request observations from backend-specific
@@ -53,7 +74,7 @@ baseline/candidate comparisons such as vLLM versus SGLang, or a current
 runtime versus a candidate runtime behind shadow traffic.
 
 Each observation records request ID, latency, health, model, backend,
-accelerator, and output material. Engines may provide their own
+accelerator, output material, and optional operational telemetry. Engines may provide their own
 `output_fingerprint`; otherwise the adapter hashes output token IDs or numeric
 output vectors with a stable FNV-1a fingerprint. Successful observations
 without output material are rejected because the release gate cannot audit
