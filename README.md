@@ -13,7 +13,8 @@ replayable scheduling traces, and canary/shadow release decisions.
 - Conservative paged-KV reservations that prevent admitted requests from
   exceeding declared capacity.
 - Round-robin decode scheduling so active requests make measurable progress.
-- Deterministic workload replay with a machine-readable trace fingerprint.
+- Deterministic workload replay with a machine-readable trace fingerprint,
+  queue-pressure summary, active-capacity summary, and KV-pressure summary.
 - Baseline/candidate release validation with `promote`, `hold`, and `rollback`
   outcomes.
 - Backend mirror normalization for vLLM/SGLang-style serving observations
@@ -31,6 +32,10 @@ cargo test --all-targets
 cargo run --release -- replay \
   --input fixtures/workload.json \
   --output artifacts/workload-replay.json
+
+cargo run --release -- replay \
+  --input fixtures/workload_pressure.json \
+  --output artifacts/workload-pressure-replay.json
 
 cargo run --release -- gate \
   --input fixtures/release_gate_safe.json \
@@ -59,8 +64,14 @@ model-version transition metadata, queue depth, KV memory pressure, TTFT, and
 decode-token p95 telemetry.
 
 The checked workload fixture completes four requests in 11 scheduler ticks,
-peaks at 12 of 20 KV pages, returns all pages on completion, and emits trace
+peaks at 12 of 20 KV pages, records three queued-pressure ticks, records three
+active-capacity ticks, returns all pages on completion, and emits trace
 fingerprint `394166dc24d38b6c`.
+
+The pressure fixture completes eight mixed-priority requests in 27 scheduler
+ticks, records a maximum queue depth of five, reaches all three active slots,
+peaks at 13 of 15 KV pages, reports 86.666667% peak KV pressure, and returns
+all pages on completion.
 
 ## Runtime Model
 
@@ -77,8 +88,9 @@ Every tick records:
 - queued and active counts; and
 - used KV pages.
 
-The replay report includes a stable trace fingerprint, peak KV pages, total
-ticks, and completion count.
+The replay report includes a stable trace fingerprint, peak KV pages, peak KV
+pressure percentage, maximum queued and active request counts, queue-pressure
+ticks, active-capacity ticks, total ticks, and completion count.
 
 ## Backend Mirror Adapter
 
