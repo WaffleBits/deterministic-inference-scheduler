@@ -276,14 +276,21 @@ pub struct ReplayInput {
     pub requests: Vec<RequestSpec>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ReplayReport {
     pub schema_version: u32,
     pub config: SchedulerConfig,
     pub request_count: usize,
     pub completed_requests: usize,
     pub total_ticks: u64,
+    pub max_queued_requests: usize,
+    pub max_active_requests: usize,
     pub peak_kv_pages: u32,
+    pub peak_kv_pressure_pct: f64,
+    pub ticks_with_queue_pressure: u64,
+    pub ticks_at_active_capacity: u64,
+    pub queue_pressure_ratio: f64,
+    pub active_capacity_ratio: f64,
     pub final_kv_pages: u32,
     pub trace_fingerprint: String,
     pub ticks: Vec<TickTrace>,
@@ -320,16 +327,42 @@ pub fn run_replay(input: ReplayInput) -> Result<ReplayReport, RuntimeError> {
         .map(|tick| tick.used_kv_pages)
         .max()
         .unwrap_or(0);
+    let max_queued_requests = ticks
+        .iter()
+        .map(|tick| tick.queued_requests)
+        .max()
+        .unwrap_or(0);
+    let max_active_requests = ticks
+        .iter()
+        .map(|tick| tick.active_requests)
+        .max()
+        .unwrap_or(0);
+    let ticks_with_queue_pressure =
+        ticks.iter().filter(|tick| tick.queued_requests > 0).count() as u64;
+    let max_active_capacity = input.config.max_active_requests;
+    let total_kv_pages = input.config.total_kv_pages;
+    let ticks_at_active_capacity = ticks
+        .iter()
+        .filter(|tick| tick.active_requests >= max_active_capacity)
+        .count() as u64;
+    let total_ticks = scheduler.current_tick();
     let trace_bytes = serde_json::to_vec(&ticks)
         .map_err(|error| RuntimeError::Serialization(error.to_string()))?;
 
     Ok(ReplayReport {
-        schema_version: 1,
+        schema_version: 2,
         config: input.config,
         request_count,
         completed_requests: scheduler.completed_count(),
-        total_ticks: scheduler.current_tick(),
+        total_ticks,
+        max_queued_requests,
+        max_active_requests,
         peak_kv_pages,
+        peak_kv_pressure_pct: pressure_pct(peak_kv_pages, total_kv_pages),
+        ticks_with_queue_pressure,
+        ticks_at_active_capacity,
+        queue_pressure_ratio: ratio(ticks_with_queue_pressure, total_ticks),
+        active_capacity_ratio: ratio(ticks_at_active_capacity, total_ticks),
         final_kv_pages: 0,
         trace_fingerprint: fnv1a64_hex(&trace_bytes),
         ticks,
@@ -343,6 +376,26 @@ fn fnv1a64_hex(bytes: &[u8]) -> String {
         hash = hash.wrapping_mul(0x100000001b3);
     }
     format!("{hash:016x}")
+}
+
+fn pressure_pct(used: u32, capacity: u32) -> f64 {
+    if capacity == 0 {
+        0.0
+    } else {
+        round6((f64::from(used) / f64::from(capacity)) * 100.0)
+    }
+}
+
+fn ratio(numerator: u64, denominator: u64) -> f64 {
+    if denominator == 0 {
+        0.0
+    } else {
+        round6(numerator as f64 / denominator as f64)
+    }
+}
+
+fn round6(value: f64) -> f64 {
+    (value * 1_000_000.0).round() / 1_000_000.0
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
