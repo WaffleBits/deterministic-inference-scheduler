@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "config": {
     "max_active_requests": 3,
     "decode_batch_size": 2,
@@ -10,7 +10,14 @@
   "request_count": 4,
   "completed_requests": 4,
   "total_ticks": 11,
+  "max_queued_requests": 1,
+  "max_active_requests": 3,
   "peak_kv_pages": 12,
+  "peak_kv_pressure_pct": 60.0,
+  "ticks_with_queue_pressure": 3,
+  "ticks_at_active_capacity": 3,
+  "queue_pressure_ratio": 0.272727,
+  "active_capacity_ratio": 0.272727,
   "final_kv_pages": 0,
   "trace_fingerprint": "394166dc24d38b6c",
   "ticks": [

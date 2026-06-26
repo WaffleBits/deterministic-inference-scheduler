@@ -1,5 +1,6 @@
 use rust_inference_runtime::{
-    GateDecision, GateInput, GateThresholds, NumericTolerance, Observation, evaluate_release,
+    GateDecision, GateInput, GateThresholds, NumericTolerance, Observation, OperationalTelemetry,
+    evaluate_release,
 };
 
 fn observation(id: &str, fingerprint: &str, latency_ms: f64, ok: bool) -> Observation {
@@ -12,6 +13,7 @@ fn observation(id: &str, fingerprint: &str, latency_ms: f64, ok: bool) -> Observ
         backend: None,
         accelerator: None,
         output_values: None,
+        telemetry: OperationalTelemetry::default(),
     }
 }
 
@@ -31,6 +33,7 @@ fn numeric_observation(
         backend: Some(backend.into()),
         accelerator: Some("h100".into()),
         output_values: Some(values.to_vec()),
+        telemetry: OperationalTelemetry::default(),
     }
 }
 
@@ -57,6 +60,7 @@ fn promotes_candidate_within_policy() {
     });
 
     assert_eq!(report.decision, GateDecision::Promote);
+    assert!(report.triage.is_empty());
 }
 
 #[test]
@@ -74,6 +78,13 @@ fn rolls_back_output_mismatch() {
 
     assert_eq!(report.decision, GateDecision::Rollback);
     assert_eq!(report.output_mismatch_rate, 0.25);
+    let triage = report
+        .triage
+        .iter()
+        .find(|item| item.signal == "output_correctness")
+        .expect("output mismatch should produce correctness triage");
+    assert_eq!(triage.response, GateDecision::Rollback);
+    assert_eq!(triage.owner_hint, "model_runtime_correctness");
 }
 
 #[test]
@@ -91,6 +102,13 @@ fn holds_latency_regression_for_investigation() {
 
     assert_eq!(report.decision, GateDecision::Hold);
     assert!(report.p95_latency_regression_pct.unwrap() > 10.0);
+    let triage = report
+        .triage
+        .iter()
+        .find(|item| item.signal == "request_latency")
+        .expect("latency regression should produce performance triage");
+    assert_eq!(triage.response, GateDecision::Hold);
+    assert_eq!(triage.owner_hint, "runtime_performance");
 }
 
 #[test]
@@ -101,6 +119,9 @@ fn promotes_candidate_with_numeric_outputs_inside_model_tolerance() {
             max_output_mismatch_rate: 0.0,
             max_error_rate_increase: 0.01,
             max_p95_latency_regression_pct: 10.0,
+            max_ttft_regression_pct: 10.0,
+            max_decode_token_p95_regression_pct: 10.0,
+            max_candidate_memory_pressure_pct: 95.0,
             max_numeric_drift_rate: 0.0,
             numeric_tolerances: vec![NumericTolerance {
                 model: Some("decoder-7b".into()),
@@ -139,6 +160,9 @@ fn rolls_back_numeric_outputs_outside_model_tolerance() {
             max_output_mismatch_rate: 0.0,
             max_error_rate_increase: 0.01,
             max_p95_latency_regression_pct: 10.0,
+            max_ttft_regression_pct: 10.0,
+            max_decode_token_p95_regression_pct: 10.0,
+            max_candidate_memory_pressure_pct: 95.0,
             max_numeric_drift_rate: 0.0,
             numeric_tolerances: vec![NumericTolerance {
                 model: Some("decoder-7b".into()),
@@ -163,6 +187,13 @@ fn rolls_back_numeric_outputs_outside_model_tolerance() {
     assert_eq!(report.decision, GateDecision::Rollback);
     assert_eq!(report.output_mismatch_rate, 0.333333);
     assert_eq!(report.numeric_drift_rate, 0.333333);
+    assert!(
+        report
+            .triage
+            .iter()
+            .any(|item| item.signal == "numeric_correctness"
+                && item.owner_hint == "accelerator_backend_correctness")
+    );
     assert!(
         report
             .reasons

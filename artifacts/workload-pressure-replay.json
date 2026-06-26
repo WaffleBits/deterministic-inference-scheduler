@@ -1,0 +1,373 @@
+{
+  "schema_version": 2,
+  "config": {
+    "max_active_requests": 3,
+    "decode_batch_size": 2,
+    "max_prefill_tokens_per_tick": 96,
+    "kv_page_tokens": 16,
+    "total_kv_pages": 15
+  },
+  "request_count": 8,
+  "completed_requests": 8,
+  "total_ticks": 27,
+  "max_queued_requests": 5,
+  "max_active_requests": 3,
+  "peak_kv_pages": 13,
+  "peak_kv_pressure_pct": 86.666667,
+  "ticks_with_queue_pressure": 19,
+  "ticks_at_active_capacity": 6,
+  "queue_pressure_ratio": 0.703704,
+  "active_capacity_ratio": 0.222222,
+  "final_kv_pages": 0,
+  "trace_fingerprint": "81dcc3b8c6005eba",
+  "ticks": [
+    {
+      "tick": 0,
+      "admitted": [
+        "interactive-001",
+        "interactive-002"
+      ],
+      "decoded": [
+        "interactive-001",
+        "interactive-002"
+      ],
+      "completed": [],
+      "queued_requests": 1,
+      "active_requests": 2,
+      "used_kv_pages": 7
+    },
+    {
+      "tick": 1,
+      "admitted": [
+        "interactive-003"
+      ],
+      "decoded": [
+        "interactive-001",
+        "interactive-002"
+      ],
+      "completed": [],
+      "queued_requests": 2,
+      "active_requests": 3,
+      "used_kv_pages": 10
+    },
+    {
+      "tick": 2,
+      "admitted": [],
+      "decoded": [
+        "interactive-003",
+        "interactive-001"
+      ],
+      "completed": [],
+      "queued_requests": 3,
+      "active_requests": 3,
+      "used_kv_pages": 10
+    },
+    {
+      "tick": 3,
+      "admitted": [],
+      "decoded": [
+        "interactive-002",
+        "interactive-003"
+      ],
+      "completed": [],
+      "queued_requests": 4,
+      "active_requests": 3,
+      "used_kv_pages": 10
+    },
+    {
+      "tick": 4,
+      "admitted": [],
+      "decoded": [
+        "interactive-001",
+        "interactive-002"
+      ],
+      "completed": [],
+      "queued_requests": 5,
+      "active_requests": 3,
+      "used_kv_pages": 10
+    },
+    {
+      "tick": 5,
+      "admitted": [],
+      "decoded": [
+        "interactive-003",
+        "interactive-001"
+      ],
+      "completed": [
+        "interactive-001"
+      ],
+      "queued_requests": 5,
+      "active_requests": 2,
+      "used_kv_pages": 7
+    },
+    {
+      "tick": 6,
+      "admitted": [
+        "interactive-004"
+      ],
+      "decoded": [
+        "interactive-002",
+        "interactive-003"
+      ],
+      "completed": [
+        "interactive-002",
+        "interactive-003"
+      ],
+      "queued_requests": 4,
+      "active_requests": 1,
+      "used_kv_pages": 3
+    },
+    {
+      "tick": 7,
+      "admitted": [
+        "interactive-005"
+      ],
+      "decoded": [
+        "interactive-004",
+        "interactive-005"
+      ],
+      "completed": [],
+      "queued_requests": 3,
+      "active_requests": 2,
+      "used_kv_pages": 6
+    },
+    {
+      "tick": 8,
+      "admitted": [
+        "batch-001"
+      ],
+      "decoded": [
+        "interactive-004",
+        "interactive-005"
+      ],
+      "completed": [],
+      "queued_requests": 2,
+      "active_requests": 3,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 9,
+      "admitted": [],
+      "decoded": [
+        "batch-001",
+        "interactive-004"
+      ],
+      "completed": [],
+      "queued_requests": 2,
+      "active_requests": 3,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 10,
+      "admitted": [],
+      "decoded": [
+        "interactive-005",
+        "batch-001"
+      ],
+      "completed": [
+        "interactive-005"
+      ],
+      "queued_requests": 2,
+      "active_requests": 2,
+      "used_kv_pages": 9
+    },
+    {
+      "tick": 11,
+      "admitted": [
+        "batch-003"
+      ],
+      "decoded": [
+        "interactive-004",
+        "batch-001"
+      ],
+      "completed": [
+        "interactive-004"
+      ],
+      "queued_requests": 1,
+      "active_requests": 2,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 12,
+      "admitted": [],
+      "decoded": [
+        "batch-003",
+        "batch-001"
+      ],
+      "completed": [],
+      "queued_requests": 1,
+      "active_requests": 2,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 13,
+      "admitted": [],
+      "decoded": [
+        "batch-003",
+        "batch-001"
+      ],
+      "completed": [],
+      "queued_requests": 1,
+      "active_requests": 2,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 14,
+      "admitted": [],
+      "decoded": [
+        "batch-003",
+        "batch-001"
+      ],
+      "completed": [],
+      "queued_requests": 1,
+      "active_requests": 2,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 15,
+      "admitted": [],
+      "decoded": [
+        "batch-003",
+        "batch-001"
+      ],
+      "completed": [],
+      "queued_requests": 1,
+      "active_requests": 2,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 16,
+      "admitted": [],
+      "decoded": [
+        "batch-003",
+        "batch-001"
+      ],
+      "completed": [],
+      "queued_requests": 1,
+      "active_requests": 2,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 17,
+      "admitted": [],
+      "decoded": [
+        "batch-003",
+        "batch-001"
+      ],
+      "completed": [],
+      "queued_requests": 1,
+      "active_requests": 2,
+      "used_kv_pages": 12
+    },
+    {
+      "tick": 18,
+      "admitted": [],
+      "decoded": [
+        "batch-003",
+        "batch-001"
+      ],
+      "completed": [
+        "batch-001"
+      ],
+      "queued_requests": 1,
+      "active_requests": 1,
+      "used_kv_pages": 6
+    },
+    {
+      "tick": 19,
+      "admitted": [
+        "batch-002"
+      ],
+      "decoded": [
+        "batch-003",
+        "batch-002"
+      ],
+      "completed": [],
+      "queued_requests": 0,
+      "active_requests": 2,
+      "used_kv_pages": 13
+    },
+    {
+      "tick": 20,
+      "admitted": [],
+      "decoded": [
+        "batch-003",
+        "batch-002"
+      ],
+      "completed": [
+        "batch-003"
+      ],
+      "queued_requests": 0,
+      "active_requests": 1,
+      "used_kv_pages": 7
+    },
+    {
+      "tick": 21,
+      "admitted": [],
+      "decoded": [
+        "batch-002"
+      ],
+      "completed": [],
+      "queued_requests": 0,
+      "active_requests": 1,
+      "used_kv_pages": 7
+    },
+    {
+      "tick": 22,
+      "admitted": [],
+      "decoded": [
+        "batch-002"
+      ],
+      "completed": [],
+      "queued_requests": 0,
+      "active_requests": 1,
+      "used_kv_pages": 7
+    },
+    {
+      "tick": 23,
+      "admitted": [],
+      "decoded": [
+        "batch-002"
+      ],
+      "completed": [],
+      "queued_requests": 0,
+      "active_requests": 1,
+      "used_kv_pages": 7
+    },
+    {
+      "tick": 24,
+      "admitted": [],
+      "decoded": [
+        "batch-002"
+      ],
+      "completed": [],
+      "queued_requests": 0,
+      "active_requests": 1,
+      "used_kv_pages": 7
+    },
+    {
+      "tick": 25,
+      "admitted": [],
+      "decoded": [
+        "batch-002"
+      ],
+      "completed": [],
+      "queued_requests": 0,
+      "active_requests": 1,
+      "used_kv_pages": 7
+    },
+    {
+      "tick": 26,
+      "admitted": [],
+      "decoded": [
+        "batch-002"
+      ],
+      "completed": [
+        "batch-002"
+      ],
+      "queued_requests": 0,
+      "active_requests": 0,
+      "used_kv_pages": 0
+    }
+  ]
+}
