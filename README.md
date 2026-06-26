@@ -22,7 +22,8 @@ replayable scheduling traces, and canary/shadow release decisions.
 - Exact output checks, model-aware numeric tolerances for backend drift,
   per-segment release summaries, error-rate deltas, p95 latency regression
   policy, TTFT and decode-token p95 checks, KV memory-pressure reporting,
-  model-version transitions, token-trace fingerprints, tests, and CI.
+  model-version transitions, token-trace fingerprints, structured triage
+  owner hints, tests, and CI.
 
 ## Quick Start
 
@@ -114,7 +115,9 @@ The gate joins mirrored baseline and candidate observations by request ID.
 Outputs can be validated either by exact fingerprint or by a configured
 numeric tolerance scoped to model, candidate backend, and accelerator. Reports
 include aggregate metrics plus segment summaries so hardware/backend-specific
-regressions remain visible.
+regressions remain visible. Hold and rollback reports also include structured
+triage items that name the failed signal, the recommended response, an owner
+hint, and the next investigation action.
 
 | Signal | Response |
 |---|---|

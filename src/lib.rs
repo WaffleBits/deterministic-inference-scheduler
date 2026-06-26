@@ -8,7 +8,7 @@ pub use adapter::{
 };
 pub use release::{
     GateDecision, GateInput, GateReport, GateThresholds, NumericTolerance, Observation,
-    OperationalTelemetry, SegmentReport, evaluate_release,
+    OperationalTelemetry, SegmentReport, TriageItem, evaluate_release,
 };
 pub use scheduler::{
     ReplayInput, ReplayReport, RequestSpec, RuntimeError, Scheduler, SchedulerConfig, TickTrace,

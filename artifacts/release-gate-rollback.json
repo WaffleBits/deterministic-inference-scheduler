@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "decision": "rollback",
   "matched_requests": 4,
   "baseline_requests": 4,
@@ -52,6 +52,22 @@
       "max_candidate_memory_pressure_pct": null,
       "token_trace_pairs": 0,
       "token_trace_mismatch_rate": 0.0
+    }
+  ],
+  "triage": [
+    {
+      "signal": "output_correctness",
+      "response": "rollback",
+      "owner_hint": "model_runtime_correctness",
+      "action": "block the candidate and compare output fingerprints or numeric tolerance scope",
+      "reason": "output mismatch rate 0.3333 exceeded 0.0000"
+    },
+    {
+      "signal": "serving_reliability",
+      "response": "rollback",
+      "owner_hint": "serving_runtime",
+      "action": "block the candidate and inspect candidate errors before rerunning the gate",
+      "reason": "error-rate increase 0.2500 exceeded 0.0100"
     }
   ],
   "reasons": [

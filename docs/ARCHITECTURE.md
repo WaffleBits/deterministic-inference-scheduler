@@ -54,6 +54,8 @@ It computes:
 Correctness, numeric drift, or reliability regressions produce `rollback`.
 Latency, token-path, memory-pressure regressions, or incomplete evidence produce
 `hold`. A complete candidate within policy produces `promote`.
+Hold and rollback reports include structured triage items so CI or rollout
+tooling can route the failed signal to a likely owner without parsing prose.
 
 This is a local validation component, not a deployment controller. Production
 integration would obtain observations from mirrored traffic, canary
