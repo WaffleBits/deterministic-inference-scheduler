@@ -190,6 +190,21 @@ fn holds_when_candidate_telemetry_exceeds_policy() {
             .iter()
             .any(|reason| reason.contains("memory pressure"))
     );
+    assert!(
+        report.triage.iter().any(
+            |item| item.signal == "time_to_first_token" && item.owner_hint == "prefill_runtime"
+        )
+    );
+    assert!(
+        report.triage.iter().any(
+            |item| item.signal == "decode_token_latency" && item.owner_hint == "decode_runtime"
+        )
+    );
+    assert!(
+        report.triage.iter().any(
+            |item| item.signal == "kv_memory_pressure" && item.owner_hint == "runtime_capacity"
+        )
+    );
 }
 
 #[test]

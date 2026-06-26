@@ -150,6 +150,15 @@ pub enum GateDecision {
     Rollback,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TriageItem {
+    pub signal: String,
+    pub response: GateDecision,
+    pub owner_hint: String,
+    pub action: String,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SegmentReport {
     pub model: String,
@@ -208,6 +217,7 @@ pub struct GateReport {
     pub token_trace_pairs: usize,
     pub token_trace_mismatch_rate: f64,
     pub segments: Vec<SegmentReport>,
+    pub triage: Vec<TriageItem>,
     pub reasons: Vec<String>,
 }
 
@@ -373,80 +383,153 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
     let token_trace_mismatch_rate = ratio(token_trace_mismatches, token_trace_pairs);
 
     let mut reasons = Vec::new();
+    let mut triage = Vec::new();
     let insufficient_coverage = matched_requests < input.thresholds.min_matched_requests
         || matched_requests != baseline_requests
         || matched_requests != candidate_requests;
     if insufficient_coverage {
-        reasons.push(format!(
-            "matched {matched_requests} requests; need at least {} with complete coverage",
-            input.thresholds.min_matched_requests
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "evidence_coverage",
+            GateDecision::Hold,
+            "release_validation",
+            "rerun mirrored traffic with complete baseline and candidate request coverage",
+            format!(
+                "matched {matched_requests} requests; need at least {} with complete coverage",
+                input.thresholds.min_matched_requests
+            ),
+        );
     }
     if comparable_outputs.is_empty() {
-        reasons.push("no successful request pairs were available for output comparison".into());
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "output_comparison_coverage",
+            GateDecision::Hold,
+            "release_validation",
+            "collect successful mirrored request pairs with auditable output material",
+            "no successful request pairs were available for output comparison".into(),
+        );
     }
 
     let correctness_failed = output_mismatch_rate > input.thresholds.max_output_mismatch_rate;
     if correctness_failed {
-        reasons.push(format!(
-            "output mismatch rate {:.4} exceeded {:.4}",
-            output_mismatch_rate, input.thresholds.max_output_mismatch_rate
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "output_correctness",
+            GateDecision::Rollback,
+            "model_runtime_correctness",
+            "block the candidate and compare output fingerprints or numeric tolerance scope",
+            format!(
+                "output mismatch rate {:.4} exceeded {:.4}",
+                output_mismatch_rate, input.thresholds.max_output_mismatch_rate
+            ),
+        );
     }
 
     let numeric_correctness_failed =
         numeric_drift_rate > input.thresholds.max_numeric_drift_rate && numeric_pairs > 0;
     if numeric_correctness_failed {
-        reasons.push(format!(
-            "numeric drift rate {:.4} exceeded {:.4}",
-            numeric_drift_rate, input.thresholds.max_numeric_drift_rate
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "numeric_correctness",
+            GateDecision::Rollback,
+            "accelerator_backend_correctness",
+            "block the candidate and review model, backend, and accelerator tolerance policy",
+            format!(
+                "numeric drift rate {:.4} exceeded {:.4}",
+                numeric_drift_rate, input.thresholds.max_numeric_drift_rate
+            ),
+        );
     }
 
     let reliability_failed = error_rate_increase > input.thresholds.max_error_rate_increase;
     if reliability_failed {
-        reasons.push(format!(
-            "error-rate increase {:.4} exceeded {:.4}",
-            error_rate_increase, input.thresholds.max_error_rate_increase
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "serving_reliability",
+            GateDecision::Rollback,
+            "serving_runtime",
+            "block the candidate and inspect candidate errors before rerunning the gate",
+            format!(
+                "error-rate increase {:.4} exceeded {:.4}",
+                error_rate_increase, input.thresholds.max_error_rate_increase
+            ),
+        );
     }
 
     let latency_failed = p95_latency_regression_pct
         .is_some_and(|regression| regression > input.thresholds.max_p95_latency_regression_pct);
     if latency_failed {
-        reasons.push(format!(
-            "p95 latency regression {:.2}% exceeded {:.2}%",
-            p95_latency_regression_pct.unwrap_or_default(),
-            input.thresholds.max_p95_latency_regression_pct
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "request_latency",
+            GateDecision::Hold,
+            "runtime_performance",
+            "profile scheduler and backend request path before rollout",
+            format!(
+                "p95 latency regression {:.2}% exceeded {:.2}%",
+                p95_latency_regression_pct.unwrap_or_default(),
+                input.thresholds.max_p95_latency_regression_pct
+            ),
+        );
     }
     let ttft_failed = ttft_regression_pct
         .is_some_and(|regression| regression > input.thresholds.max_ttft_regression_pct);
     if ttft_failed {
-        reasons.push(format!(
-            "TTFT p95 regression {:.2}% exceeded {:.2}%",
-            ttft_regression_pct.unwrap_or_default(),
-            input.thresholds.max_ttft_regression_pct
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "time_to_first_token",
+            GateDecision::Hold,
+            "prefill_runtime",
+            "inspect prefill queueing and first-token path before rollout",
+            format!(
+                "TTFT p95 regression {:.2}% exceeded {:.2}%",
+                ttft_regression_pct.unwrap_or_default(),
+                input.thresholds.max_ttft_regression_pct
+            ),
+        );
     }
     let decode_token_latency_failed = decode_token_p95_regression_pct.is_some_and(|regression| {
         regression > input.thresholds.max_decode_token_p95_regression_pct
     });
     if decode_token_latency_failed {
-        reasons.push(format!(
-            "decode-token p95 regression {:.2}% exceeded {:.2}%",
-            decode_token_p95_regression_pct.unwrap_or_default(),
-            input.thresholds.max_decode_token_p95_regression_pct
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "decode_token_latency",
+            GateDecision::Hold,
+            "decode_runtime",
+            "inspect decode loop, batching policy, and backend saturation before rollout",
+            format!(
+                "decode-token p95 regression {:.2}% exceeded {:.2}%",
+                decode_token_p95_regression_pct.unwrap_or_default(),
+                input.thresholds.max_decode_token_p95_regression_pct
+            ),
+        );
     }
     let memory_pressure_failed = max_candidate_memory_pressure_pct
         .is_some_and(|pressure| pressure > input.thresholds.max_candidate_memory_pressure_pct);
     if memory_pressure_failed {
-        reasons.push(format!(
-            "candidate memory pressure {:.2}% exceeded {:.2}%",
-            max_candidate_memory_pressure_pct.unwrap_or_default(),
-            input.thresholds.max_candidate_memory_pressure_pct
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "kv_memory_pressure",
+            GateDecision::Hold,
+            "runtime_capacity",
+            "inspect KV reservation, queue pressure, and capacity policy before rollout",
+            format!(
+                "candidate memory pressure {:.2}% exceeded {:.2}%",
+                max_candidate_memory_pressure_pct.unwrap_or_default(),
+                input.thresholds.max_candidate_memory_pressure_pct
+            ),
+        );
     }
 
     let decision = if correctness_failed || numeric_correctness_failed || reliability_failed {
@@ -468,7 +551,7 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
     };
 
     GateReport {
-        schema_version: 2,
+        schema_version: 3,
         decision,
         matched_requests,
         baseline_requests,
@@ -497,8 +580,28 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
         token_trace_pairs,
         token_trace_mismatch_rate,
         segments: segment_reports(&matched, &matched_comparisons),
+        triage,
         reasons,
     }
+}
+
+fn add_triage(
+    reasons: &mut Vec<String>,
+    triage: &mut Vec<TriageItem>,
+    signal: &str,
+    response: GateDecision,
+    owner_hint: &str,
+    action: &str,
+    reason: String,
+) {
+    reasons.push(reason.clone());
+    triage.push(TriageItem {
+        signal: signal.into(),
+        response,
+        owner_hint: owner_hint.into(),
+        action: action.into(),
+        reason,
+    });
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -66,6 +66,19 @@ mismatch rate. Correct outputs with excessive latency or memory pressure produce
 `hold`, not `rollback`, because the evidence points to performance or capacity
 risk rather than a correctness failure.
 
+## Triage Output
+
+Every hold or rollback reason is mirrored into a structured `triage` item.
+Each item records:
+
+- the failed signal;
+- the recommended response;
+- an owner hint; and
+- the next investigation action.
+
+This keeps the human-readable `reasons` field intact while making deploy-gate
+output easier to route through CI, incident tooling, or rollout dashboards.
+
 ## Backend Mirror Adapter
 
 The `mirror` command normalizes request observations from backend-specific
