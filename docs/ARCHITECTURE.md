@@ -29,6 +29,12 @@ runner preserves input order for equal arrival times and emits a stable FNV-1a
 fingerprint over the serialized trace. Replaying the same input should produce
 the same admission, decode, completion, and memory sequence.
 
+The replay report also summarizes workload pressure: maximum queued requests,
+maximum active requests, peak KV pages, peak KV pressure percentage, ticks with
+queued requests, ticks at active capacity, and pressure ratios over the full
+run. Those fields make stress fixtures reviewable without requiring a reader to
+manually inspect every tick.
+
 ## Release Gate
 
 The release evaluator joins baseline and candidate observations by request ID.
@@ -39,13 +45,17 @@ It computes:
 - model/backend-scoped numeric drift when fingerprints differ;
 - error-rate increase;
 - successful-request p95 latency; and
-- candidate p95 regression; and
-- segment summaries by model, baseline backend, candidate backend, and
-  accelerator.
+- candidate p95 regression;
+- TTFT p95 and decode-token p95 regression;
+- candidate queue depth and KV memory pressure; and
+- segment summaries by model, model version, baseline backend, candidate
+  backend, and accelerator.
 
 Correctness, numeric drift, or reliability regressions produce `rollback`.
-Latency regressions or incomplete evidence produce `hold`. A complete candidate
-within policy produces `promote`.
+Latency, token-path, memory-pressure regressions, or incomplete evidence produce
+`hold`. A complete candidate within policy produces `promote`.
+Hold and rollback reports include structured triage items so CI or rollout
+tooling can route the failed signal to a likely owner without parsing prose.
 
 This is a local validation component, not a deployment controller. Production
 integration would obtain observations from mirrored traffic, canary
@@ -59,8 +69,9 @@ keeps ingestion concerns separate from rollout decisions.
 
 The adapter currently accepts compact vLLM/SGLang-style request summaries:
 request ID, latency, health, model, backend, accelerator, output token IDs,
-optional explicit fingerprints, and optional numeric vectors. If an engine does
-not provide a fingerprint, the adapter computes a stable FNV-1a fingerprint
-from token IDs or numeric values. Successful observations without output
-material are rejected so a candidate cannot be promoted from latency-only
-evidence.
+optional explicit fingerprints, optional numeric vectors, model version, queue
+depth, KV page usage, TTFT, decode-token latencies, and optional token-trace
+fingerprints. If an engine does not provide an output fingerprint, the adapter
+computes a stable FNV-1a fingerprint from token IDs or numeric values.
+Successful observations without output material are rejected so a candidate
+cannot be promoted from latency-only evidence.

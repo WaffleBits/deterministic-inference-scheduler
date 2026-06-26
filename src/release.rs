@@ -16,6 +16,37 @@ pub struct Observation {
     pub accelerator: Option<String>,
     #[serde(default)]
     pub output_values: Option<Vec<f64>>,
+    #[serde(default)]
+    pub telemetry: OperationalTelemetry,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct OperationalTelemetry {
+    #[serde(default)]
+    pub model_version: Option<String>,
+    #[serde(default)]
+    pub queue_depth: Option<usize>,
+    #[serde(default)]
+    pub kv_pages_used: Option<usize>,
+    #[serde(default)]
+    pub kv_pages_capacity: Option<usize>,
+    #[serde(default)]
+    pub time_to_first_token_ms: Option<f64>,
+    #[serde(default)]
+    pub decode_token_latencies_ms: Vec<f64>,
+    #[serde(default)]
+    pub token_trace_fingerprint: Option<String>,
+}
+
+impl OperationalTelemetry {
+    fn memory_pressure_pct(&self) -> Option<f64> {
+        match (self.kv_pages_used, self.kv_pages_capacity) {
+            (Some(used), Some(capacity)) if capacity > 0 => {
+                Some(round6((used as f64 / capacity as f64) * 100.0))
+            }
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -63,6 +94,12 @@ pub struct GateThresholds {
     pub max_output_mismatch_rate: f64,
     pub max_error_rate_increase: f64,
     pub max_p95_latency_regression_pct: f64,
+    #[serde(default = "default_max_ttft_regression_pct")]
+    pub max_ttft_regression_pct: f64,
+    #[serde(default = "default_max_decode_token_p95_regression_pct")]
+    pub max_decode_token_p95_regression_pct: f64,
+    #[serde(default = "default_max_candidate_memory_pressure_pct")]
+    pub max_candidate_memory_pressure_pct: f64,
     #[serde(default)]
     pub max_numeric_drift_rate: f64,
     #[serde(default)]
@@ -76,10 +113,25 @@ impl Default for GateThresholds {
             max_output_mismatch_rate: 0.0,
             max_error_rate_increase: 0.01,
             max_p95_latency_regression_pct: 10.0,
+            max_ttft_regression_pct: default_max_ttft_regression_pct(),
+            max_decode_token_p95_regression_pct: default_max_decode_token_p95_regression_pct(),
+            max_candidate_memory_pressure_pct: default_max_candidate_memory_pressure_pct(),
             max_numeric_drift_rate: 0.0,
             numeric_tolerances: Vec::new(),
         }
     }
+}
+
+fn default_max_ttft_regression_pct() -> f64 {
+    10.0
+}
+
+fn default_max_decode_token_p95_regression_pct() -> f64 {
+    10.0
+}
+
+fn default_max_candidate_memory_pressure_pct() -> f64 {
+    95.0
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -98,12 +150,23 @@ pub enum GateDecision {
     Rollback,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TriageItem {
+    pub signal: String,
+    pub response: GateDecision,
+    pub owner_hint: String,
+    pub action: String,
+    pub reason: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SegmentReport {
     pub model: String,
     pub baseline_backend: String,
     pub candidate_backend: String,
     pub accelerator: String,
+    pub baseline_model_version: String,
+    pub candidate_model_version: String,
     pub matched_requests: usize,
     pub output_mismatch_rate: f64,
     pub baseline_error_rate: f64,
@@ -111,6 +174,16 @@ pub struct SegmentReport {
     pub baseline_p95_latency_ms: Option<f64>,
     pub candidate_p95_latency_ms: Option<f64>,
     pub p95_latency_regression_pct: Option<f64>,
+    pub baseline_p95_ttft_ms: Option<f64>,
+    pub candidate_p95_ttft_ms: Option<f64>,
+    pub ttft_regression_pct: Option<f64>,
+    pub baseline_decode_token_p95_ms: Option<f64>,
+    pub candidate_decode_token_p95_ms: Option<f64>,
+    pub decode_token_p95_regression_pct: Option<f64>,
+    pub max_candidate_queue_depth: Option<usize>,
+    pub max_candidate_memory_pressure_pct: Option<f64>,
+    pub token_trace_pairs: usize,
+    pub token_trace_mismatch_rate: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -133,7 +206,18 @@ pub struct GateReport {
     pub baseline_p95_latency_ms: Option<f64>,
     pub candidate_p95_latency_ms: Option<f64>,
     pub p95_latency_regression_pct: Option<f64>,
+    pub baseline_p95_ttft_ms: Option<f64>,
+    pub candidate_p95_ttft_ms: Option<f64>,
+    pub ttft_regression_pct: Option<f64>,
+    pub baseline_decode_token_p95_ms: Option<f64>,
+    pub candidate_decode_token_p95_ms: Option<f64>,
+    pub decode_token_p95_regression_pct: Option<f64>,
+    pub max_candidate_queue_depth: Option<usize>,
+    pub max_candidate_memory_pressure_pct: Option<f64>,
+    pub token_trace_pairs: usize,
+    pub token_trace_mismatch_rate: f64,
     pub segments: Vec<SegmentReport>,
+    pub triage: Vec<TriageItem>,
     pub reasons: Vec<String>,
 }
 
@@ -236,67 +320,238 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
     );
     let p95_latency_regression_pct =
         latency_regression_pct(baseline_p95_latency_ms, candidate_p95_latency_ms);
+    let baseline_p95_ttft_ms = percentile95(
+        matched
+            .iter()
+            .filter(|(baseline, _)| baseline.ok)
+            .filter_map(|(baseline, _)| baseline.telemetry.time_to_first_token_ms),
+    );
+    let candidate_p95_ttft_ms = percentile95(
+        matched
+            .iter()
+            .filter(|(_, candidate)| candidate.ok)
+            .filter_map(|(_, candidate)| candidate.telemetry.time_to_first_token_ms),
+    );
+    let ttft_regression_pct = latency_regression_pct(baseline_p95_ttft_ms, candidate_p95_ttft_ms);
+    let baseline_decode_token_p95_ms =
+        percentile95(matched.iter().filter(|(baseline, _)| baseline.ok).flat_map(
+            |(baseline, _)| baseline.telemetry.decode_token_latencies_ms.iter().copied(),
+        ));
+    let candidate_decode_token_p95_ms = percentile95(
+        matched
+            .iter()
+            .filter(|(_, candidate)| candidate.ok)
+            .flat_map(|(_, candidate)| {
+                candidate
+                    .telemetry
+                    .decode_token_latencies_ms
+                    .iter()
+                    .copied()
+            }),
+    );
+    let decode_token_p95_regression_pct =
+        latency_regression_pct(baseline_decode_token_p95_ms, candidate_decode_token_p95_ms);
+    let max_candidate_queue_depth = matched
+        .iter()
+        .filter_map(|(_, candidate)| candidate.telemetry.queue_depth)
+        .max();
+    let max_candidate_memory_pressure_pct = max_comparison_value(
+        matched
+            .iter()
+            .filter_map(|(_, candidate)| candidate.telemetry.memory_pressure_pct())
+            .map(Some),
+    );
+    let token_trace_pairs = matched
+        .iter()
+        .filter(|(baseline, candidate)| {
+            baseline.telemetry.token_trace_fingerprint.is_some()
+                && candidate.telemetry.token_trace_fingerprint.is_some()
+        })
+        .count();
+    let token_trace_mismatches = matched
+        .iter()
+        .filter(|(baseline, candidate)| {
+            match (
+                &baseline.telemetry.token_trace_fingerprint,
+                &candidate.telemetry.token_trace_fingerprint,
+            ) {
+                (Some(baseline_trace), Some(candidate_trace)) => baseline_trace != candidate_trace,
+                _ => false,
+            }
+        })
+        .count();
+    let token_trace_mismatch_rate = ratio(token_trace_mismatches, token_trace_pairs);
 
     let mut reasons = Vec::new();
+    let mut triage = Vec::new();
     let insufficient_coverage = matched_requests < input.thresholds.min_matched_requests
         || matched_requests != baseline_requests
         || matched_requests != candidate_requests;
     if insufficient_coverage {
-        reasons.push(format!(
-            "matched {matched_requests} requests; need at least {} with complete coverage",
-            input.thresholds.min_matched_requests
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "evidence_coverage",
+            GateDecision::Hold,
+            "release_validation",
+            "rerun mirrored traffic with complete baseline and candidate request coverage",
+            format!(
+                "matched {matched_requests} requests; need at least {} with complete coverage",
+                input.thresholds.min_matched_requests
+            ),
+        );
     }
     if comparable_outputs.is_empty() {
-        reasons.push("no successful request pairs were available for output comparison".into());
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "output_comparison_coverage",
+            GateDecision::Hold,
+            "release_validation",
+            "collect successful mirrored request pairs with auditable output material",
+            "no successful request pairs were available for output comparison".into(),
+        );
     }
 
     let correctness_failed = output_mismatch_rate > input.thresholds.max_output_mismatch_rate;
     if correctness_failed {
-        reasons.push(format!(
-            "output mismatch rate {:.4} exceeded {:.4}",
-            output_mismatch_rate, input.thresholds.max_output_mismatch_rate
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "output_correctness",
+            GateDecision::Rollback,
+            "model_runtime_correctness",
+            "block the candidate and compare output fingerprints or numeric tolerance scope",
+            format!(
+                "output mismatch rate {:.4} exceeded {:.4}",
+                output_mismatch_rate, input.thresholds.max_output_mismatch_rate
+            ),
+        );
     }
 
     let numeric_correctness_failed =
         numeric_drift_rate > input.thresholds.max_numeric_drift_rate && numeric_pairs > 0;
     if numeric_correctness_failed {
-        reasons.push(format!(
-            "numeric drift rate {:.4} exceeded {:.4}",
-            numeric_drift_rate, input.thresholds.max_numeric_drift_rate
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "numeric_correctness",
+            GateDecision::Rollback,
+            "accelerator_backend_correctness",
+            "block the candidate and review model, backend, and accelerator tolerance policy",
+            format!(
+                "numeric drift rate {:.4} exceeded {:.4}",
+                numeric_drift_rate, input.thresholds.max_numeric_drift_rate
+            ),
+        );
     }
 
     let reliability_failed = error_rate_increase > input.thresholds.max_error_rate_increase;
     if reliability_failed {
-        reasons.push(format!(
-            "error-rate increase {:.4} exceeded {:.4}",
-            error_rate_increase, input.thresholds.max_error_rate_increase
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "serving_reliability",
+            GateDecision::Rollback,
+            "serving_runtime",
+            "block the candidate and inspect candidate errors before rerunning the gate",
+            format!(
+                "error-rate increase {:.4} exceeded {:.4}",
+                error_rate_increase, input.thresholds.max_error_rate_increase
+            ),
+        );
     }
 
     let latency_failed = p95_latency_regression_pct
         .is_some_and(|regression| regression > input.thresholds.max_p95_latency_regression_pct);
     if latency_failed {
-        reasons.push(format!(
-            "p95 latency regression {:.2}% exceeded {:.2}%",
-            p95_latency_regression_pct.unwrap_or_default(),
-            input.thresholds.max_p95_latency_regression_pct
-        ));
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "request_latency",
+            GateDecision::Hold,
+            "runtime_performance",
+            "profile scheduler and backend request path before rollout",
+            format!(
+                "p95 latency regression {:.2}% exceeded {:.2}%",
+                p95_latency_regression_pct.unwrap_or_default(),
+                input.thresholds.max_p95_latency_regression_pct
+            ),
+        );
+    }
+    let ttft_failed = ttft_regression_pct
+        .is_some_and(|regression| regression > input.thresholds.max_ttft_regression_pct);
+    if ttft_failed {
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "time_to_first_token",
+            GateDecision::Hold,
+            "prefill_runtime",
+            "inspect prefill queueing and first-token path before rollout",
+            format!(
+                "TTFT p95 regression {:.2}% exceeded {:.2}%",
+                ttft_regression_pct.unwrap_or_default(),
+                input.thresholds.max_ttft_regression_pct
+            ),
+        );
+    }
+    let decode_token_latency_failed = decode_token_p95_regression_pct.is_some_and(|regression| {
+        regression > input.thresholds.max_decode_token_p95_regression_pct
+    });
+    if decode_token_latency_failed {
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "decode_token_latency",
+            GateDecision::Hold,
+            "decode_runtime",
+            "inspect decode loop, batching policy, and backend saturation before rollout",
+            format!(
+                "decode-token p95 regression {:.2}% exceeded {:.2}%",
+                decode_token_p95_regression_pct.unwrap_or_default(),
+                input.thresholds.max_decode_token_p95_regression_pct
+            ),
+        );
+    }
+    let memory_pressure_failed = max_candidate_memory_pressure_pct
+        .is_some_and(|pressure| pressure > input.thresholds.max_candidate_memory_pressure_pct);
+    if memory_pressure_failed {
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "kv_memory_pressure",
+            GateDecision::Hold,
+            "runtime_capacity",
+            "inspect KV reservation, queue pressure, and capacity policy before rollout",
+            format!(
+                "candidate memory pressure {:.2}% exceeded {:.2}%",
+                max_candidate_memory_pressure_pct.unwrap_or_default(),
+                input.thresholds.max_candidate_memory_pressure_pct
+            ),
+        );
     }
 
     let decision = if correctness_failed || numeric_correctness_failed || reliability_failed {
         GateDecision::Rollback
-    } else if insufficient_coverage || comparable_outputs.is_empty() || latency_failed {
+    } else if insufficient_coverage
+        || comparable_outputs.is_empty()
+        || latency_failed
+        || ttft_failed
+        || decode_token_latency_failed
+        || memory_pressure_failed
+    {
         GateDecision::Hold
     } else {
-        reasons.push("candidate stayed within correctness, reliability, and latency policy".into());
+        reasons.push(
+            "candidate stayed within correctness, reliability, latency, and telemetry policy"
+                .into(),
+        );
         GateDecision::Promote
     };
 
     GateReport {
-        schema_version: 2,
+        schema_version: 3,
         decision,
         matched_requests,
         baseline_requests,
@@ -314,9 +569,39 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
         baseline_p95_latency_ms,
         candidate_p95_latency_ms,
         p95_latency_regression_pct,
+        baseline_p95_ttft_ms,
+        candidate_p95_ttft_ms,
+        ttft_regression_pct,
+        baseline_decode_token_p95_ms,
+        candidate_decode_token_p95_ms,
+        decode_token_p95_regression_pct,
+        max_candidate_queue_depth,
+        max_candidate_memory_pressure_pct,
+        token_trace_pairs,
+        token_trace_mismatch_rate,
         segments: segment_reports(&matched, &matched_comparisons),
+        triage,
         reasons,
     }
+}
+
+fn add_triage(
+    reasons: &mut Vec<String>,
+    triage: &mut Vec<TriageItem>,
+    signal: &str,
+    response: GateDecision,
+    owner_hint: &str,
+    action: &str,
+    reason: String,
+) {
+    reasons.push(reason.clone());
+    triage.push(TriageItem {
+        signal: signal.into(),
+        response,
+        owner_hint: owner_hint.into(),
+        action: action.into(),
+        reason,
+    });
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -429,6 +714,8 @@ struct SegmentKey {
     baseline_backend: String,
     candidate_backend: String,
     accelerator: String,
+    baseline_model_version: String,
+    candidate_model_version: String,
 }
 
 #[derive(Debug, Default)]
@@ -440,6 +727,14 @@ struct SegmentAccumulator {
     output_mismatches: usize,
     baseline_latencies: Vec<f64>,
     candidate_latencies: Vec<f64>,
+    baseline_ttft_latencies: Vec<f64>,
+    candidate_ttft_latencies: Vec<f64>,
+    baseline_decode_token_latencies: Vec<f64>,
+    candidate_decode_token_latencies: Vec<f64>,
+    candidate_queue_depths: Vec<usize>,
+    candidate_memory_pressure_pct: Vec<f64>,
+    token_trace_pairs: usize,
+    token_trace_mismatches: usize,
 }
 
 fn segment_reports(
@@ -466,9 +761,42 @@ fn segment_reports(
         }
         if baseline.ok {
             entry.baseline_latencies.push(baseline.latency_ms);
+            if let Some(ttft) = baseline.telemetry.time_to_first_token_ms {
+                entry.baseline_ttft_latencies.push(ttft);
+            }
+            entry
+                .baseline_decode_token_latencies
+                .extend(baseline.telemetry.decode_token_latencies_ms.iter().copied());
         }
         if candidate.ok {
             entry.candidate_latencies.push(candidate.latency_ms);
+            if let Some(ttft) = candidate.telemetry.time_to_first_token_ms {
+                entry.candidate_ttft_latencies.push(ttft);
+            }
+            entry.candidate_decode_token_latencies.extend(
+                candidate
+                    .telemetry
+                    .decode_token_latencies_ms
+                    .iter()
+                    .copied(),
+            );
+        }
+        if let Some(queue_depth) = candidate.telemetry.queue_depth {
+            entry.candidate_queue_depths.push(queue_depth);
+        }
+        if let Some(memory_pressure_pct) = candidate.telemetry.memory_pressure_pct() {
+            entry
+                .candidate_memory_pressure_pct
+                .push(memory_pressure_pct);
+        }
+        if let (Some(baseline_trace), Some(candidate_trace)) = (
+            &baseline.telemetry.token_trace_fingerprint,
+            &candidate.telemetry.token_trace_fingerprint,
+        ) {
+            entry.token_trace_pairs += 1;
+            if baseline_trace != candidate_trace {
+                entry.token_trace_mismatches += 1;
+            }
         }
     }
 
@@ -478,11 +806,21 @@ fn segment_reports(
             let baseline_p95_latency_ms = percentile95(accumulator.baseline_latencies.into_iter());
             let candidate_p95_latency_ms =
                 percentile95(accumulator.candidate_latencies.into_iter());
+            let baseline_p95_ttft_ms =
+                percentile95(accumulator.baseline_ttft_latencies.into_iter());
+            let candidate_p95_ttft_ms =
+                percentile95(accumulator.candidate_ttft_latencies.into_iter());
+            let baseline_decode_token_p95_ms =
+                percentile95(accumulator.baseline_decode_token_latencies.into_iter());
+            let candidate_decode_token_p95_ms =
+                percentile95(accumulator.candidate_decode_token_latencies.into_iter());
             SegmentReport {
                 model: key.model,
                 baseline_backend: key.baseline_backend,
                 candidate_backend: key.candidate_backend,
                 accelerator: key.accelerator,
+                baseline_model_version: key.baseline_model_version,
+                candidate_model_version: key.candidate_model_version,
                 matched_requests: accumulator.matched_requests,
                 output_mismatch_rate: ratio(
                     accumulator.output_mismatches,
@@ -501,6 +839,30 @@ fn segment_reports(
                 p95_latency_regression_pct: latency_regression_pct(
                     baseline_p95_latency_ms,
                     candidate_p95_latency_ms,
+                ),
+                baseline_p95_ttft_ms,
+                candidate_p95_ttft_ms,
+                ttft_regression_pct: latency_regression_pct(
+                    baseline_p95_ttft_ms,
+                    candidate_p95_ttft_ms,
+                ),
+                baseline_decode_token_p95_ms,
+                candidate_decode_token_p95_ms,
+                decode_token_p95_regression_pct: latency_regression_pct(
+                    baseline_decode_token_p95_ms,
+                    candidate_decode_token_p95_ms,
+                ),
+                max_candidate_queue_depth: accumulator.candidate_queue_depths.into_iter().max(),
+                max_candidate_memory_pressure_pct: max_comparison_value(
+                    accumulator
+                        .candidate_memory_pressure_pct
+                        .into_iter()
+                        .map(Some),
+                ),
+                token_trace_pairs: accumulator.token_trace_pairs,
+                token_trace_mismatch_rate: ratio(
+                    accumulator.token_trace_mismatches,
+                    accumulator.token_trace_pairs,
                 ),
             }
         })
@@ -531,6 +893,8 @@ fn segment_key(baseline: &Observation, candidate: &Observation) -> SegmentKey {
             .or(baseline.accelerator.as_ref())
             .cloned()
             .unwrap_or_else(|| "unspecified".into()),
+        baseline_model_version: optional_label(&baseline.telemetry.model_version),
+        candidate_model_version: optional_label(&candidate.telemetry.model_version),
     }
 }
 

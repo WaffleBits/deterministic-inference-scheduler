@@ -38,6 +38,11 @@ fn replay_is_deterministic() {
     assert_eq!(first, second);
     assert_eq!(first.ticks[0].admitted, vec!["urgent", "normal"]);
     assert_eq!(first.completed_requests, 2);
+    assert_eq!(first.max_queued_requests, 0);
+    assert_eq!(first.max_active_requests, 2);
+    assert_eq!(first.peak_kv_pressure_pct, 62.5);
+    assert_eq!(first.queue_pressure_ratio, 0.0);
+    assert_eq!(first.active_capacity_ratio, 0.333333);
     assert_eq!(first.final_kv_pages, 0);
 }
 
@@ -101,4 +106,26 @@ fn round_robin_decode_prevents_active_request_starvation() {
 
     let decoded: Vec<String> = (0..3).flat_map(|_| scheduler.step().decoded).collect();
     assert_eq!(decoded, vec!["a", "b", "c"]);
+}
+
+#[test]
+fn pressure_replay_reports_queue_and_capacity_summary() {
+    let input: ReplayInput =
+        serde_json::from_str(include_str!("../fixtures/workload_pressure.json")).unwrap();
+
+    let report = run_replay(input).unwrap();
+
+    assert_eq!(report.schema_version, 2);
+    assert_eq!(report.request_count, report.completed_requests);
+    assert!(report.max_queued_requests >= 3);
+    assert_eq!(
+        report.max_active_requests,
+        report.config.max_active_requests
+    );
+    assert!(report.peak_kv_pressure_pct > 80.0);
+    assert!(report.ticks_with_queue_pressure > 0);
+    assert!(report.ticks_at_active_capacity > 0);
+    assert!(report.queue_pressure_ratio > 0.0);
+    assert!(report.active_capacity_ratio > 0.0);
+    assert_eq!(report.final_kv_pages, 0);
 }

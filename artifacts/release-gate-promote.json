@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "decision": "promote",
   "matched_requests": 4,
   "baseline_requests": 4,
@@ -17,22 +17,45 @@
   "baseline_p95_latency_ms": 16.0,
   "candidate_p95_latency_ms": 16.7,
   "p95_latency_regression_pct": 4.375,
+  "baseline_p95_ttft_ms": null,
+  "candidate_p95_ttft_ms": null,
+  "ttft_regression_pct": null,
+  "baseline_decode_token_p95_ms": null,
+  "candidate_decode_token_p95_ms": null,
+  "decode_token_p95_regression_pct": null,
+  "max_candidate_queue_depth": null,
+  "max_candidate_memory_pressure_pct": null,
+  "token_trace_pairs": 0,
+  "token_trace_mismatch_rate": 0.0,
   "segments": [
     {
       "model": "unspecified",
       "baseline_backend": "unspecified",
       "candidate_backend": "unspecified",
       "accelerator": "unspecified",
+      "baseline_model_version": "unspecified",
+      "candidate_model_version": "unspecified",
       "matched_requests": 4,
       "output_mismatch_rate": 0.0,
       "baseline_error_rate": 0.0,
       "candidate_error_rate": 0.0,
       "baseline_p95_latency_ms": 16.0,
       "candidate_p95_latency_ms": 16.7,
-      "p95_latency_regression_pct": 4.375
+      "p95_latency_regression_pct": 4.375,
+      "baseline_p95_ttft_ms": null,
+      "candidate_p95_ttft_ms": null,
+      "ttft_regression_pct": null,
+      "baseline_decode_token_p95_ms": null,
+      "candidate_decode_token_p95_ms": null,
+      "decode_token_p95_regression_pct": null,
+      "max_candidate_queue_depth": null,
+      "max_candidate_memory_pressure_pct": null,
+      "token_trace_pairs": 0,
+      "token_trace_mismatch_rate": 0.0
     }
   ],
+  "triage": [],
   "reasons": [
-    "candidate stayed within correctness, reliability, and latency policy"
+    "candidate stayed within correctness, reliability, latency, and telemetry policy"
   ]
 }
