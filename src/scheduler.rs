@@ -115,7 +115,9 @@ struct ActiveRequest {
 pub struct TickTrace {
     pub tick: u64,
     pub admitted: Vec<String>,
+    pub admitted_prefill_tokens: u32,
     pub decoded: Vec<String>,
+    pub decoded_tokens: u32,
     pub completed: Vec<String>,
     pub queued_requests: usize,
     pub active_requests: usize,
@@ -172,15 +174,17 @@ impl Scheduler {
         let mut trace = TickTrace {
             tick: self.tick,
             admitted: Vec::new(),
+            admitted_prefill_tokens: 0,
             decoded: Vec::new(),
+            decoded_tokens: 0,
             completed: Vec::new(),
             queued_requests: 0,
             active_requests: 0,
             used_kv_pages: 0,
         };
 
-        self.admit_requests(&mut trace.admitted);
-        self.decode_requests(&mut trace.decoded, &mut trace.completed);
+        trace.admitted_prefill_tokens = self.admit_requests(&mut trace.admitted);
+        trace.decoded_tokens = self.decode_requests(&mut trace.decoded, &mut trace.completed);
 
         trace.queued_requests = self.queue.len();
         trace.active_requests = self.active.len();
@@ -197,10 +201,11 @@ impl Scheduler {
         self.completed_ids.len()
     }
 
-    fn admit_requests(&mut self, admitted: &mut Vec<String>) {
+    fn admit_requests(&mut self, admitted: &mut Vec<String>) -> u32 {
         let mut remaining_prefill = self.config.max_prefill_tokens_per_tick;
         let mut deferred = Vec::new();
         let candidates = self.queue.len();
+        let mut admitted_prefill_tokens = 0;
 
         for _ in 0..candidates {
             if self.active.len() >= self.config.max_active_requests {
@@ -218,6 +223,7 @@ impl Scheduler {
 
             if pages_fit && prefill_fits {
                 remaining_prefill = remaining_prefill.saturating_sub(candidate.spec.prompt_tokens);
+                admitted_prefill_tokens += candidate.spec.prompt_tokens;
                 self.used_kv_pages += pages;
                 let id = candidate.spec.id.clone();
                 self.active.insert(
@@ -236,9 +242,10 @@ impl Scheduler {
         }
 
         self.queue.extend(deferred);
+        admitted_prefill_tokens
     }
 
-    fn decode_requests(&mut self, decoded: &mut Vec<String>, completed: &mut Vec<String>) {
+    fn decode_requests(&mut self, decoded: &mut Vec<String>, completed: &mut Vec<String>) -> u32 {
         let batch_size = self.config.decode_batch_size.min(self.decode_order.len());
 
         for _ in 0..batch_size {
@@ -267,6 +274,8 @@ impl Scheduler {
                 self.decode_order.push_back(id);
             }
         }
+
+        decoded.len() as u32
     }
 }
 
@@ -282,6 +291,9 @@ pub struct ReplayReport {
     pub config: SchedulerConfig,
     pub request_count: usize,
     pub completed_requests: usize,
+    pub total_prompt_tokens: u64,
+    pub total_decode_tokens: u64,
+    pub total_reserved_kv_pages: u64,
     pub total_ticks: u64,
     pub max_queued_requests: usize,
     pub max_active_requests: usize,
@@ -289,8 +301,14 @@ pub struct ReplayReport {
     pub peak_kv_pressure_pct: f64,
     pub ticks_with_queue_pressure: u64,
     pub ticks_at_active_capacity: u64,
+    pub declared_prefill_capacity_tokens: u64,
+    pub declared_decode_capacity_tokens: u64,
+    pub kv_page_capacity_ticks: u64,
     pub queue_pressure_ratio: f64,
     pub active_capacity_ratio: f64,
+    pub prefill_capacity_utilization: f64,
+    pub decode_capacity_utilization: f64,
+    pub kv_page_occupancy_ratio: f64,
     pub final_kv_pages: u32,
     pub trace_fingerprint: String,
     pub ticks: Vec<TickTrace>,
@@ -300,6 +318,18 @@ pub fn run_replay(input: ReplayInput) -> Result<ReplayReport, RuntimeError> {
     let mut scheduler = Scheduler::new(input.config.clone())?;
     let request_count = input.requests.len();
     let mut pending: Vec<(usize, RequestSpec)> = input.requests.into_iter().enumerate().collect();
+    let total_prompt_tokens = pending
+        .iter()
+        .map(|(_, request)| u64::from(request.prompt_tokens))
+        .sum();
+    let total_decode_tokens = pending
+        .iter()
+        .map(|(_, request)| u64::from(request.max_output_tokens))
+        .sum();
+    let total_reserved_kv_pages = pending
+        .iter()
+        .map(|(_, request)| u64::from(request.reserved_pages(input.config.kv_page_tokens)))
+        .sum();
     pending.sort_by(|(left_index, left), (right_index, right)| {
         left.arrival_tick
             .cmp(&right.arrival_tick)
@@ -346,14 +376,23 @@ pub fn run_replay(input: ReplayInput) -> Result<ReplayReport, RuntimeError> {
         .filter(|tick| tick.active_requests >= max_active_capacity)
         .count() as u64;
     let total_ticks = scheduler.current_tick();
+    let declared_prefill_capacity_tokens =
+        total_ticks.saturating_mul(u64::from(input.config.max_prefill_tokens_per_tick));
+    let declared_decode_capacity_tokens =
+        total_ticks.saturating_mul(input.config.decode_batch_size as u64);
+    let kv_page_capacity_ticks = total_ticks.saturating_mul(u64::from(total_kv_pages));
+    let occupied_kv_page_ticks = ticks.iter().map(|tick| u64::from(tick.used_kv_pages)).sum();
     let trace_bytes = serde_json::to_vec(&ticks)
         .map_err(|error| RuntimeError::Serialization(error.to_string()))?;
 
     Ok(ReplayReport {
-        schema_version: 2,
+        schema_version: 3,
         config: input.config,
         request_count,
         completed_requests: scheduler.completed_count(),
+        total_prompt_tokens,
+        total_decode_tokens,
+        total_reserved_kv_pages,
         total_ticks,
         max_queued_requests,
         max_active_requests,
@@ -361,8 +400,14 @@ pub fn run_replay(input: ReplayInput) -> Result<ReplayReport, RuntimeError> {
         peak_kv_pressure_pct: pressure_pct(peak_kv_pages, total_kv_pages),
         ticks_with_queue_pressure,
         ticks_at_active_capacity,
+        declared_prefill_capacity_tokens,
+        declared_decode_capacity_tokens,
+        kv_page_capacity_ticks,
         queue_pressure_ratio: ratio(ticks_with_queue_pressure, total_ticks),
         active_capacity_ratio: ratio(ticks_at_active_capacity, total_ticks),
+        prefill_capacity_utilization: ratio(total_prompt_tokens, declared_prefill_capacity_tokens),
+        decode_capacity_utilization: ratio(total_decode_tokens, declared_decode_capacity_tokens),
+        kv_page_occupancy_ratio: ratio(occupied_kv_page_ticks, kv_page_capacity_ticks),
         final_kv_pages: 0,
         trace_fingerprint: fnv1a64_hex(&trace_bytes),
         ticks,
