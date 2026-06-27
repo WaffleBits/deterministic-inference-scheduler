@@ -38,11 +38,21 @@ fn replay_is_deterministic() {
     assert_eq!(first, second);
     assert_eq!(first.ticks[0].admitted, vec!["urgent", "normal"]);
     assert_eq!(first.completed_requests, 2);
+    assert_eq!(first.schema_version, 3);
+    assert_eq!(first.total_prompt_tokens, 48);
+    assert_eq!(first.total_decode_tokens, 5);
+    assert_eq!(first.total_reserved_kv_pages, 5);
     assert_eq!(first.max_queued_requests, 0);
     assert_eq!(first.max_active_requests, 2);
     assert_eq!(first.peak_kv_pressure_pct, 62.5);
+    assert_eq!(first.declared_prefill_capacity_tokens, 144);
+    assert_eq!(first.declared_decode_capacity_tokens, 6);
+    assert_eq!(first.kv_page_capacity_ticks, 24);
     assert_eq!(first.queue_pressure_ratio, 0.0);
     assert_eq!(first.active_capacity_ratio, 0.333333);
+    assert_eq!(first.prefill_capacity_utilization, 0.333333);
+    assert_eq!(first.decode_capacity_utilization, 0.833333);
+    assert!(first.kv_page_occupancy_ratio > 0.0);
     assert_eq!(first.final_kv_pages, 0);
 }
 
@@ -115,8 +125,11 @@ fn pressure_replay_reports_queue_and_capacity_summary() {
 
     let report = run_replay(input).unwrap();
 
-    assert_eq!(report.schema_version, 2);
+    assert_eq!(report.schema_version, 3);
     assert_eq!(report.request_count, report.completed_requests);
+    assert_eq!(report.total_prompt_tokens, 432);
+    assert_eq!(report.total_decode_tokens, 48);
+    assert_eq!(report.total_reserved_kv_pages, 35);
     assert!(report.max_queued_requests >= 3);
     assert_eq!(
         report.max_active_requests,
@@ -127,5 +140,8 @@ fn pressure_replay_reports_queue_and_capacity_summary() {
     assert!(report.ticks_at_active_capacity > 0);
     assert!(report.queue_pressure_ratio > 0.0);
     assert!(report.active_capacity_ratio > 0.0);
+    assert!(report.prefill_capacity_utilization > 0.0);
+    assert!(report.decode_capacity_utilization > 0.0);
+    assert!(report.kv_page_occupancy_ratio > 0.0);
     assert_eq!(report.final_kv_pages, 0);
 }

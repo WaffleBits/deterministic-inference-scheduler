@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "config": {
     "max_active_requests": 3,
     "decode_batch_size": 2,
@@ -9,6 +9,9 @@
   },
   "request_count": 4,
   "completed_requests": 4,
+  "total_prompt_tokens": 224,
+  "total_decode_tokens": 18,
+  "total_reserved_kv_pages": 18,
   "total_ticks": 11,
   "max_queued_requests": 1,
   "max_active_requests": 3,
@@ -16,10 +19,16 @@
   "peak_kv_pressure_pct": 60.0,
   "ticks_with_queue_pressure": 3,
   "ticks_at_active_capacity": 3,
+  "declared_prefill_capacity_tokens": 1056,
+  "declared_decode_capacity_tokens": 22,
+  "kv_page_capacity_ticks": 220,
   "queue_pressure_ratio": 0.272727,
   "active_capacity_ratio": 0.272727,
+  "prefill_capacity_utilization": 0.212121,
+  "decode_capacity_utilization": 0.818182,
+  "kv_page_occupancy_ratio": 0.4,
   "final_kv_pages": 0,
-  "trace_fingerprint": "394166dc24d38b6c",
+  "trace_fingerprint": "b454ea97ea75ee90",
   "ticks": [
     {
       "tick": 0,
@@ -27,10 +36,12 @@
         "interactive-001",
         "batch-001"
       ],
+      "admitted_prefill_tokens": 96,
       "decoded": [
         "interactive-001",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 2,
@@ -41,10 +52,12 @@
       "admitted": [
         "interactive-002"
       ],
+      "admitted_prefill_tokens": 48,
       "decoded": [
         "interactive-001",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 3,
@@ -53,10 +66,12 @@
     {
       "tick": 2,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "interactive-002",
         "interactive-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 3,
@@ -65,10 +80,12 @@
     {
       "tick": 3,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-001",
         "interactive-002"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 3,
@@ -77,10 +94,12 @@
     {
       "tick": 4,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "interactive-001",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "interactive-001"
       ],
@@ -93,10 +112,12 @@
       "admitted": [
         "batch-002"
       ],
+      "admitted_prefill_tokens": 80,
       "decoded": [
         "interactive-002",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "interactive-002"
       ],
@@ -107,10 +128,12 @@
     {
       "tick": 6,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "batch-001"
       ],
@@ -121,9 +144,11 @@
     {
       "tick": 7,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 1,
@@ -132,9 +157,11 @@
     {
       "tick": 8,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 1,
@@ -143,9 +170,11 @@
     {
       "tick": 9,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 1,
@@ -154,9 +183,11 @@
     {
       "tick": 10,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [
         "batch-002"
       ],

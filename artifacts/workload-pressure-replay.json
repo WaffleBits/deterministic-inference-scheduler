@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "config": {
     "max_active_requests": 3,
     "decode_batch_size": 2,
@@ -9,6 +9,9 @@
   },
   "request_count": 8,
   "completed_requests": 8,
+  "total_prompt_tokens": 432,
+  "total_decode_tokens": 48,
+  "total_reserved_kv_pages": 35,
   "total_ticks": 27,
   "max_queued_requests": 5,
   "max_active_requests": 3,
@@ -16,10 +19,16 @@
   "peak_kv_pressure_pct": 86.666667,
   "ticks_with_queue_pressure": 19,
   "ticks_at_active_capacity": 6,
+  "declared_prefill_capacity_tokens": 2592,
+  "declared_decode_capacity_tokens": 54,
+  "kv_page_capacity_ticks": 405,
   "queue_pressure_ratio": 0.703704,
   "active_capacity_ratio": 0.222222,
+  "prefill_capacity_utilization": 0.166667,
+  "decode_capacity_utilization": 0.888889,
+  "kv_page_occupancy_ratio": 0.595062,
   "final_kv_pages": 0,
-  "trace_fingerprint": "81dcc3b8c6005eba",
+  "trace_fingerprint": "fe52cca977038f01",
   "ticks": [
     {
       "tick": 0,
@@ -27,10 +36,12 @@
         "interactive-001",
         "interactive-002"
       ],
+      "admitted_prefill_tokens": 80,
       "decoded": [
         "interactive-001",
         "interactive-002"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 2,
@@ -41,10 +52,12 @@
       "admitted": [
         "interactive-003"
       ],
+      "admitted_prefill_tokens": 32,
       "decoded": [
         "interactive-001",
         "interactive-002"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 2,
       "active_requests": 3,
@@ -53,10 +66,12 @@
     {
       "tick": 2,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "interactive-003",
         "interactive-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 3,
       "active_requests": 3,
@@ -65,10 +80,12 @@
     {
       "tick": 3,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "interactive-002",
         "interactive-003"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 4,
       "active_requests": 3,
@@ -77,10 +94,12 @@
     {
       "tick": 4,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "interactive-001",
         "interactive-002"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 5,
       "active_requests": 3,
@@ -89,10 +108,12 @@
     {
       "tick": 5,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "interactive-003",
         "interactive-001"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "interactive-001"
       ],
@@ -105,10 +126,12 @@
       "admitted": [
         "interactive-004"
       ],
+      "admitted_prefill_tokens": 40,
       "decoded": [
         "interactive-002",
         "interactive-003"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "interactive-002",
         "interactive-003"
@@ -122,10 +145,12 @@
       "admitted": [
         "interactive-005"
       ],
+      "admitted_prefill_tokens": 32,
       "decoded": [
         "interactive-004",
         "interactive-005"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 3,
       "active_requests": 2,
@@ -136,10 +161,12 @@
       "admitted": [
         "batch-001"
       ],
+      "admitted_prefill_tokens": 80,
       "decoded": [
         "interactive-004",
         "interactive-005"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 2,
       "active_requests": 3,
@@ -148,10 +175,12 @@
     {
       "tick": 9,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-001",
         "interactive-004"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 2,
       "active_requests": 3,
@@ -160,10 +189,12 @@
     {
       "tick": 10,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "interactive-005",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "interactive-005"
       ],
@@ -176,10 +207,12 @@
       "admitted": [
         "batch-003"
       ],
+      "admitted_prefill_tokens": 72,
       "decoded": [
         "interactive-004",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "interactive-004"
       ],
@@ -190,10 +223,12 @@
     {
       "tick": 12,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-003",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 2,
@@ -202,10 +237,12 @@
     {
       "tick": 13,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-003",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 2,
@@ -214,10 +251,12 @@
     {
       "tick": 14,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-003",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 2,
@@ -226,10 +265,12 @@
     {
       "tick": 15,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-003",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 2,
@@ -238,10 +279,12 @@
     {
       "tick": 16,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-003",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 2,
@@ -250,10 +293,12 @@
     {
       "tick": 17,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-003",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 1,
       "active_requests": 2,
@@ -262,10 +307,12 @@
     {
       "tick": 18,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-003",
         "batch-001"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "batch-001"
       ],
@@ -278,10 +325,12 @@
       "admitted": [
         "batch-002"
       ],
+      "admitted_prefill_tokens": 96,
       "decoded": [
         "batch-003",
         "batch-002"
       ],
+      "decoded_tokens": 2,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 2,
@@ -290,10 +339,12 @@
     {
       "tick": 20,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-003",
         "batch-002"
       ],
+      "decoded_tokens": 2,
       "completed": [
         "batch-003"
       ],
@@ -304,9 +355,11 @@
     {
       "tick": 21,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 1,
@@ -315,9 +368,11 @@
     {
       "tick": 22,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 1,
@@ -326,9 +381,11 @@
     {
       "tick": 23,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 1,
@@ -337,9 +394,11 @@
     {
       "tick": 24,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 1,
@@ -348,9 +407,11 @@
     {
       "tick": 25,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [],
       "queued_requests": 0,
       "active_requests": 1,
@@ -359,9 +420,11 @@
     {
       "tick": 26,
       "admitted": [],
+      "admitted_prefill_tokens": 0,
       "decoded": [
         "batch-002"
       ],
+      "decoded_tokens": 1,
       "completed": [
         "batch-002"
       ],
