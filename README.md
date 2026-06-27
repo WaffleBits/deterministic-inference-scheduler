@@ -14,7 +14,8 @@ replayable scheduling traces, and canary/shadow release decisions.
   exceeding declared capacity.
 - Round-robin decode scheduling so active requests make measurable progress.
 - Deterministic workload replay with a machine-readable trace fingerprint,
-  queue-pressure summary, active-capacity summary, and KV-pressure summary.
+  queue-pressure summary, active-capacity summary, KV-pressure summary, and
+  replay-level capacity envelope.
 - Baseline/candidate release validation with `promote`, `hold`, and `rollback`
   outcomes.
 - Backend mirror normalization for vLLM/SGLang-style serving observations
@@ -65,14 +66,17 @@ model-version transition metadata, queue depth, KV memory pressure, TTFT, and
 decode-token p95 telemetry.
 
 The checked workload fixture completes four requests in 11 scheduler ticks,
+accounts for 224 prompt tokens, 18 decode tokens, and 18 reserved KV pages,
 peaks at 12 of 20 KV pages, records three queued-pressure ticks, records three
-active-capacity ticks, returns all pages on completion, and emits trace
-fingerprint `394166dc24d38b6c`.
+active-capacity ticks, reports 0.818182 decode-capacity utilization, returns
+all pages on completion, and emits trace fingerprint `b454ea97ea75ee90`.
 
 The pressure fixture completes eight mixed-priority requests in 27 scheduler
 ticks, records a maximum queue depth of five, reaches all three active slots,
-peaks at 13 of 15 KV pages, reports 86.666667% peak KV pressure, and returns
-all pages on completion.
+accounts for 432 prompt tokens, 48 decode tokens, and 35 reserved KV pages,
+peaks at 13 of 15 KV pages, reports 86.666667% peak KV pressure, records
+0.888889 decode-capacity utilization and 0.595062 KV-page occupancy, and
+returns all pages on completion.
 
 ## Runtime Model
 
@@ -85,13 +89,17 @@ order with a configurable batch width.
 Every tick records:
 
 - admitted request IDs;
+- admitted prefill tokens;
 - decoded and completed request IDs;
+- decoded token count;
 - queued and active counts; and
 - used KV pages.
 
 The replay report includes a stable trace fingerprint, peak KV pages, peak KV
 pressure percentage, maximum queued and active request counts, queue-pressure
-ticks, active-capacity ticks, total ticks, and completion count.
+ticks, active-capacity ticks, total prompt and decode tokens, total reserved KV
+pages, declared prefill/decode/KV capacity, utilization ratios, total ticks,
+and completion count.
 
 ## Backend Mirror Adapter
 
