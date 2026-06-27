@@ -29,11 +29,12 @@ runner preserves input order for equal arrival times and emits a stable FNV-1a
 fingerprint over the serialized trace. Replaying the same input should produce
 the same admission, decode, completion, and memory sequence.
 
-The replay report also summarizes workload pressure: maximum queued requests,
-maximum active requests, peak KV pages, peak KV pressure percentage, ticks with
-queued requests, ticks at active capacity, and pressure ratios over the full
-run. Those fields make stress fixtures reviewable without requiring a reader to
-manually inspect every tick.
+The replay report also summarizes workload pressure and capacity use: maximum
+queued requests, maximum active requests, peak KV pages, peak KV pressure
+percentage, ticks with queued requests, ticks at active capacity, total prompt
+and decode tokens, total reserved KV pages, declared prefill/decode/KV capacity,
+and utilization ratios over the full run. Those fields make stress fixtures
+reviewable without requiring a reader to manually inspect every tick.
 
 ## Release Gate
 
