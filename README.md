@@ -20,6 +20,8 @@ replayable scheduling traces, and canary/shadow release decisions.
   outcomes.
 - Backend mirror normalization for vLLM/SGLang-style serving observations
   before the release gate runs.
+- Streaming token-event normalization with route and scheduler provenance for
+  mirrored serving traces.
 - Exact output checks, model-aware numeric tolerances for backend drift,
   per-segment release summaries, error-rate deltas, p95 latency regression
   policy, TTFT and decode-token p95 checks, KV memory-pressure reporting,
@@ -54,6 +56,10 @@ cargo run --release -- gate \
 cargo run --release -- mirror-gate \
   --input fixtures/backend_mirror_vllm_sglang.json \
   --output artifacts/backend-mirror-report.json
+
+cargo run --release -- mirror-gate \
+  --input fixtures/backend_mirror_streaming_vllm_sglang.json \
+  --output artifacts/backend-mirror-streaming-report.json
 ```
 
 The safe fixture produces `promote`. The candidate with an output mismatch and
@@ -64,6 +70,11 @@ The backend-mirror fixture converts vLLM/SGLang-style request observations into
 the same release gate and produces `promote` with a vLLM to SGLang segment,
 model-version transition metadata, queue depth, KV memory pressure, TTFT, and
 decode-token p95 telemetry.
+The streaming mirror fixture uses per-token stream events instead of compact
+token arrays and requires complete candidate route and scheduler provenance. It
+produces `promote` with `candidate_routing_provenance_rate: 1.0`,
+`candidate_streaming_trace_rate: 1.0`, two candidate routes, and
+`continuous-batching` scheduler evidence.
 
 The checked workload fixture completes four requests in 11 scheduler ticks,
 accounts for 224 prompt tokens, 18 decode tokens, and 18 reserved KV pages,
@@ -108,14 +119,18 @@ gate input. `runtime-lab mirror-gate` performs the conversion and immediately
 evaluates the release policy.
 
 The adapter accepts per-request latency, health, model, backend, accelerator,
-output token IDs, explicit output fingerprints, and optional numeric output
-vectors. Successful observations must carry output material so correctness
-checks remain auditable. Token IDs and numeric vectors are converted into
-stable FNV-1a fingerprints when an engine-specific fingerprint is not supplied.
-Observations may also carry model version, queue depth, KV page usage, TTFT,
-decode-token latencies, and token-trace fingerprints. Those fields let the gate
-surface rollout context and hold a candidate when latency or memory-pressure
-telemetry crosses policy even if output correctness is intact.
+output token IDs, explicit output fingerprints, optional numeric output
+vectors, and optional streaming token events. Successful observations must
+carry output material so correctness checks remain auditable. Token IDs,
+streaming token events, and numeric vectors are converted into stable FNV-1a
+fingerprints when an engine-specific fingerprint is not supplied. Observations
+may also carry model version, route ID, replica ID, scheduler policy, queue
+depth, KV page usage, TTFT, decode-token latencies, and token-trace
+fingerprints. When per-token stream events are provided, the adapter derives
+TTFT and decode-token gaps from their elapsed timestamps. Those fields let the
+gate surface rollout context and hold a candidate when latency, memory
+pressure, routing provenance, or streaming trace coverage crosses policy even
+if output correctness is intact.
 
 ## Release Policy
 
@@ -134,6 +149,7 @@ hint, and the next investigation action.
 | Error-rate increase above policy | `rollback` |
 | p95 latency regression above policy | `hold` |
 | TTFT, decode-token p95, or memory-pressure regression above policy | `hold` |
+| Missing required candidate route/scheduler or streaming-token evidence | `hold` |
 | Missing or insufficient matched traffic | `hold` |
 | Complete evidence within policy | `promote` |
 

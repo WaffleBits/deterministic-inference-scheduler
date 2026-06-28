@@ -1,0 +1,73 @@
+{
+  "schema_version": 4,
+  "decision": "promote",
+  "matched_requests": 4,
+  "baseline_requests": 4,
+  "candidate_requests": 4,
+  "coverage_rate": 1.0,
+  "output_mismatch_rate": 0.0,
+  "numeric_pairs": 0,
+  "tolerated_numeric_outputs": 0,
+  "numeric_drift_rate": 0.0,
+  "max_numeric_abs_error": null,
+  "max_numeric_rel_error": null,
+  "baseline_error_rate": 0.0,
+  "candidate_error_rate": 0.0,
+  "error_rate_increase": 0.0,
+  "baseline_p95_latency_ms": 28.0,
+  "candidate_p95_latency_ms": 27.2,
+  "p95_latency_regression_pct": -2.857143,
+  "baseline_p95_ttft_ms": 9.0,
+  "candidate_p95_ttft_ms": 8.5,
+  "ttft_regression_pct": -5.555556,
+  "baseline_decode_token_p95_ms": 7.0,
+  "candidate_decode_token_p95_ms": 6.5,
+  "decode_token_p95_regression_pct": -7.142857,
+  "max_candidate_queue_depth": 6,
+  "max_candidate_memory_pressure_pct": 60.0,
+  "candidate_routing_provenance_rate": 1.0,
+  "candidate_streaming_trace_rate": 1.0,
+  "candidate_route_count": 2,
+  "candidate_scheduler_policies": [
+    "continuous-batching"
+  ],
+  "token_trace_pairs": 4,
+  "token_trace_mismatch_rate": 0.0,
+  "segments": [
+    {
+      "model": "decoder-7b",
+      "baseline_backend": "vllm",
+      "candidate_backend": "sglang",
+      "accelerator": "h100",
+      "baseline_model_version": "decoder-7b@baseline-2026-06-28",
+      "candidate_model_version": "decoder-7b@candidate-2026-06-28",
+      "matched_requests": 4,
+      "output_mismatch_rate": 0.0,
+      "baseline_error_rate": 0.0,
+      "candidate_error_rate": 0.0,
+      "baseline_p95_latency_ms": 28.0,
+      "candidate_p95_latency_ms": 27.2,
+      "p95_latency_regression_pct": -2.857143,
+      "baseline_p95_ttft_ms": 9.0,
+      "candidate_p95_ttft_ms": 8.5,
+      "ttft_regression_pct": -5.555556,
+      "baseline_decode_token_p95_ms": 7.0,
+      "candidate_decode_token_p95_ms": 6.5,
+      "decode_token_p95_regression_pct": -7.142857,
+      "max_candidate_queue_depth": 6,
+      "max_candidate_memory_pressure_pct": 60.0,
+      "candidate_routing_provenance_rate": 1.0,
+      "candidate_streaming_trace_rate": 1.0,
+      "candidate_route_count": 2,
+      "candidate_scheduler_policies": [
+        "continuous-batching"
+      ],
+      "token_trace_pairs": 4,
+      "token_trace_mismatch_rate": 0.0
+    }
+  ],
+  "triage": [],
+  "reasons": [
+    "candidate stayed within correctness, reliability, latency, and telemetry policy"
+  ]
+}
