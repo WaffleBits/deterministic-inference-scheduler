@@ -1,6 +1,6 @@
 use rust_inference_runtime::{
     BackendMirrorInput, BackendObservation, BackendObservationSet, GateDecision, GateThresholds,
-    NumericTolerance, evaluate_release, mirror_to_gate_input,
+    NumericTolerance, StreamingTokenEvent, evaluate_release, mirror_to_gate_input,
 };
 
 fn backend_set(backend: &str, observations: Vec<BackendObservation>) -> BackendObservationSet {
@@ -22,6 +22,10 @@ fn token_observation(id: &str, latency_ms: f64, token_ids: &[i64]) -> BackendObs
         output_values: None,
         error: None,
         model_version: None,
+        route_id: None,
+        replica_id: None,
+        scheduler_policy: None,
+        streaming_token_events: Vec::new(),
         queue_depth: None,
         kv_pages_used: None,
         kv_pages_capacity: None,
@@ -49,6 +53,10 @@ fn telemetry_observation(
         output_values: None,
         error: None,
         model_version: Some("decoder-7b@2026-06-24".into()),
+        route_id: None,
+        replica_id: None,
+        scheduler_policy: None,
+        streaming_token_events: Vec::new(),
         queue_depth: Some(queue_depth),
         kv_pages_used: Some(kv_pages_used),
         kv_pages_capacity: Some(20),
@@ -68,9 +76,52 @@ fn numeric_observation(id: &str, latency_ms: f64, values: &[f64]) -> BackendObse
         output_values: Some(values.to_vec()),
         error: None,
         model_version: None,
+        route_id: None,
+        replica_id: None,
+        scheduler_policy: None,
+        streaming_token_events: Vec::new(),
         queue_depth: None,
         kv_pages_used: None,
         kv_pages_capacity: None,
+        time_to_first_token_ms: None,
+        decode_token_latencies_ms: Vec::new(),
+        token_trace_fingerprint: None,
+    }
+}
+
+fn streaming_observation(
+    id: &str,
+    latency_ms: f64,
+    token_ids: &[i64],
+    elapsed_ms: &[f64],
+    route_id: &str,
+    scheduler_policy: &str,
+) -> BackendObservation {
+    BackendObservation {
+        request_id: id.into(),
+        latency_ms,
+        ok: Some(true),
+        output_fingerprint: None,
+        output_token_ids: Vec::new(),
+        output_values: None,
+        error: None,
+        model_version: Some("decoder-7b@stream-2026-06-28".into()),
+        route_id: Some(route_id.into()),
+        replica_id: Some(format!("{route_id}-replica-0")),
+        scheduler_policy: Some(scheduler_policy.into()),
+        streaming_token_events: token_ids
+            .iter()
+            .zip(elapsed_ms.iter())
+            .enumerate()
+            .map(|(sequence, (token_id, elapsed_ms))| StreamingTokenEvent {
+                sequence,
+                token_id: *token_id,
+                elapsed_ms: *elapsed_ms,
+            })
+            .collect(),
+        queue_depth: Some(3),
+        kv_pages_used: Some(10),
+        kv_pages_capacity: Some(20),
         time_to_first_token_ms: None,
         decode_token_latencies_ms: Vec::new(),
         token_trace_fingerprint: None,
@@ -145,6 +196,160 @@ fn carries_operational_telemetry_into_release_report() {
     assert_eq!(report.token_trace_mismatch_rate, 0.0);
     assert_eq!(report.candidate_p95_ttft_ms, Some(7.5));
     assert_eq!(report.candidate_decode_token_p95_ms, Some(6.0));
+}
+
+#[test]
+fn derives_streaming_events_and_route_provenance_into_release_report() {
+    let input = BackendMirrorInput {
+        thresholds: GateThresholds {
+            min_matched_requests: 3,
+            require_candidate_route_provenance: true,
+            require_streaming_token_trace: true,
+            ..GateThresholds::default()
+        },
+        baseline: backend_set(
+            "vllm",
+            vec![
+                streaming_observation(
+                    "prompt-a",
+                    18.0,
+                    &[101, 1402, 13],
+                    &[6.0, 10.0, 14.5],
+                    "route-prefill-a",
+                    "continuous-batching",
+                ),
+                streaming_observation(
+                    "prompt-b",
+                    21.0,
+                    &[205, 778, 990],
+                    &[6.5, 11.0, 15.5],
+                    "route-prefill-a",
+                    "continuous-batching",
+                ),
+                streaming_observation(
+                    "prompt-c",
+                    24.0,
+                    &[42, 42, 7],
+                    &[7.0, 11.5, 16.0],
+                    "route-prefill-b",
+                    "continuous-batching",
+                ),
+            ],
+        ),
+        candidate: backend_set(
+            "sglang",
+            vec![
+                streaming_observation(
+                    "prompt-a",
+                    17.5,
+                    &[101, 1402, 13],
+                    &[5.1, 9.0, 12.9],
+                    "route-prefill-a",
+                    "continuous-batching",
+                ),
+                streaming_observation(
+                    "prompt-b",
+                    20.6,
+                    &[205, 778, 990],
+                    &[5.4, 9.5, 13.5],
+                    "route-prefill-a",
+                    "continuous-batching",
+                ),
+                streaming_observation(
+                    "prompt-c",
+                    23.5,
+                    &[42, 42, 7],
+                    &[5.8, 10.2, 14.5],
+                    "route-prefill-b",
+                    "continuous-batching",
+                ),
+            ],
+        ),
+    };
+
+    let report = evaluate_release(&mirror_to_gate_input(&input).expect("valid mirror input"));
+
+    assert_eq!(report.decision, GateDecision::Promote);
+    assert_eq!(report.output_mismatch_rate, 0.0);
+    assert_eq!(report.candidate_routing_provenance_rate, 1.0);
+    assert_eq!(report.candidate_streaming_trace_rate, 1.0);
+    assert_eq!(report.candidate_route_count, 2);
+    assert_eq!(
+        report.candidate_scheduler_policies,
+        vec!["continuous-batching".to_string()]
+    );
+    assert_eq!(report.candidate_p95_ttft_ms, Some(5.8));
+    assert_eq!(report.candidate_decode_token_p95_ms, Some(4.4));
+    assert_eq!(report.token_trace_pairs, 3);
+    assert_eq!(report.segments[0].candidate_route_count, 2);
+    assert_eq!(report.segments[0].candidate_streaming_trace_rate, 1.0);
+}
+
+#[test]
+fn holds_when_required_streaming_or_route_provenance_is_missing() {
+    let input = BackendMirrorInput {
+        thresholds: GateThresholds {
+            min_matched_requests: 3,
+            require_candidate_route_provenance: true,
+            require_streaming_token_trace: true,
+            ..GateThresholds::default()
+        },
+        baseline: backend_set(
+            "vllm",
+            vec![
+                streaming_observation(
+                    "prompt-a",
+                    18.0,
+                    &[101],
+                    &[6.0],
+                    "route-prefill-a",
+                    "continuous-batching",
+                ),
+                streaming_observation(
+                    "prompt-b",
+                    21.0,
+                    &[205],
+                    &[6.5],
+                    "route-prefill-a",
+                    "continuous-batching",
+                ),
+                streaming_observation(
+                    "prompt-c",
+                    24.0,
+                    &[42],
+                    &[7.0],
+                    "route-prefill-b",
+                    "continuous-batching",
+                ),
+            ],
+        ),
+        candidate: backend_set(
+            "sglang",
+            vec![
+                token_observation("prompt-a", 17.5, &[101]),
+                token_observation("prompt-b", 20.6, &[205]),
+                token_observation("prompt-c", 23.5, &[42]),
+            ],
+        ),
+    };
+
+    let report = evaluate_release(&mirror_to_gate_input(&input).expect("valid mirror input"));
+
+    assert_eq!(report.decision, GateDecision::Hold);
+    assert_eq!(report.candidate_routing_provenance_rate, 0.0);
+    assert_eq!(report.candidate_streaming_trace_rate, 0.0);
+    assert!(
+        report
+            .triage
+            .iter()
+            .any(|item| item.signal == "routing_provenance")
+    );
+    assert!(
+        report
+            .triage
+            .iter()
+            .any(|item| item.signal == "streaming_token_trace")
+    );
 }
 
 #[test]
@@ -226,6 +431,8 @@ fn numeric_mirror_outputs_use_model_backend_tolerance() {
                 max_abs_error: 0.002,
                 max_rel_error: 0.01,
             }],
+            require_candidate_route_provenance: false,
+            require_streaming_token_trace: false,
         },
         baseline: backend_set(
             "vllm",
@@ -268,6 +475,10 @@ fn rejects_successful_observation_without_output_material() {
                 output_values: None,
                 error: None,
                 model_version: None,
+                route_id: None,
+                replica_id: None,
+                scheduler_policy: None,
+                streaming_token_events: Vec::new(),
                 queue_depth: None,
                 kv_pages_used: None,
                 kv_pages_capacity: None,
