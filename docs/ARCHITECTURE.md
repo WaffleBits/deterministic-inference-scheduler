@@ -48,13 +48,15 @@ It computes:
 - successful-request p95 latency; and
 - candidate p95 regression;
 - TTFT p95 and decode-token p95 regression;
-- candidate queue depth and KV memory pressure; and
+- candidate queue depth and KV memory pressure;
+- candidate route/scheduler provenance and streaming trace coverage; and
 - segment summaries by model, model version, baseline backend, candidate
   backend, and accelerator.
 
 Correctness, numeric drift, or reliability regressions produce `rollback`.
-Latency, token-path, memory-pressure regressions, or incomplete evidence produce
-`hold`. A complete candidate within policy produces `promote`.
+Latency, token-path, memory-pressure, missing routing provenance, missing
+streaming trace coverage, or incomplete evidence produce `hold`. A complete
+candidate within policy produces `promote`.
 Hold and rollback reports include structured triage items so CI or rollout
 tooling can route the failed signal to a likely owner without parsing prose.
 
@@ -68,11 +70,13 @@ The adapter sits before the release gate. It normalizes backend-specific
 mirrored observations into `GateInput` without changing the gate policy. This
 keeps ingestion concerns separate from rollout decisions.
 
-The adapter currently accepts compact vLLM/SGLang-style request summaries:
-request ID, latency, health, model, backend, accelerator, output token IDs,
-optional explicit fingerprints, optional numeric vectors, model version, queue
-depth, KV page usage, TTFT, decode-token latencies, and optional token-trace
-fingerprints. If an engine does not provide an output fingerprint, the adapter
-computes a stable FNV-1a fingerprint from token IDs or numeric values.
-Successful observations without output material are rejected so a candidate
-cannot be promoted from latency-only evidence.
+The adapter currently accepts compact vLLM/SGLang-style request summaries and
+streaming request traces: request ID, latency, health, model, backend,
+accelerator, output token IDs, streaming token events, optional explicit
+fingerprints, optional numeric vectors, model version, route ID, replica ID,
+scheduler policy, queue depth, KV page usage, TTFT, decode-token latencies, and
+optional token-trace fingerprints. If an engine does not provide an output
+fingerprint, the adapter computes a stable FNV-1a fingerprint from token IDs,
+streaming token events, or numeric values. Successful observations without
+output material are rejected so a candidate cannot be promoted from
+latency-only evidence.

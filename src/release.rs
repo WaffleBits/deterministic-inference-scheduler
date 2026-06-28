@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -24,6 +24,14 @@ pub struct Observation {
 pub struct OperationalTelemetry {
     #[serde(default)]
     pub model_version: Option<String>,
+    #[serde(default)]
+    pub route_id: Option<String>,
+    #[serde(default)]
+    pub replica_id: Option<String>,
+    #[serde(default)]
+    pub scheduler_policy: Option<String>,
+    #[serde(default)]
+    pub streamed_token_count: usize,
     #[serde(default)]
     pub queue_depth: Option<usize>,
     #[serde(default)]
@@ -104,6 +112,10 @@ pub struct GateThresholds {
     pub max_numeric_drift_rate: f64,
     #[serde(default)]
     pub numeric_tolerances: Vec<NumericTolerance>,
+    #[serde(default)]
+    pub require_candidate_route_provenance: bool,
+    #[serde(default)]
+    pub require_streaming_token_trace: bool,
 }
 
 impl Default for GateThresholds {
@@ -118,6 +130,8 @@ impl Default for GateThresholds {
             max_candidate_memory_pressure_pct: default_max_candidate_memory_pressure_pct(),
             max_numeric_drift_rate: 0.0,
             numeric_tolerances: Vec::new(),
+            require_candidate_route_provenance: false,
+            require_streaming_token_trace: false,
         }
     }
 }
@@ -182,6 +196,10 @@ pub struct SegmentReport {
     pub decode_token_p95_regression_pct: Option<f64>,
     pub max_candidate_queue_depth: Option<usize>,
     pub max_candidate_memory_pressure_pct: Option<f64>,
+    pub candidate_routing_provenance_rate: f64,
+    pub candidate_streaming_trace_rate: f64,
+    pub candidate_route_count: usize,
+    pub candidate_scheduler_policies: Vec<String>,
     pub token_trace_pairs: usize,
     pub token_trace_mismatch_rate: f64,
 }
@@ -214,6 +232,10 @@ pub struct GateReport {
     pub decode_token_p95_regression_pct: Option<f64>,
     pub max_candidate_queue_depth: Option<usize>,
     pub max_candidate_memory_pressure_pct: Option<f64>,
+    pub candidate_routing_provenance_rate: f64,
+    pub candidate_streaming_trace_rate: f64,
+    pub candidate_route_count: usize,
+    pub candidate_scheduler_policies: Vec<String>,
     pub token_trace_pairs: usize,
     pub token_trace_mismatch_rate: f64,
     pub segments: Vec<SegmentReport>,
@@ -361,6 +383,31 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
             .filter_map(|(_, candidate)| candidate.telemetry.memory_pressure_pct())
             .map(Some),
     );
+    let successful_candidate_requests =
+        matched.iter().filter(|(_, candidate)| candidate.ok).count();
+    let candidate_routing_provenance_count = matched
+        .iter()
+        .filter(|(_, candidate)| candidate.ok && has_candidate_route_provenance(candidate))
+        .count();
+    let candidate_streaming_trace_count = matched
+        .iter()
+        .filter(|(_, candidate)| candidate.ok && has_streaming_token_trace(candidate))
+        .count();
+    let candidate_routing_provenance_rate = ratio(
+        candidate_routing_provenance_count,
+        successful_candidate_requests,
+    );
+    let candidate_streaming_trace_rate = ratio(
+        candidate_streaming_trace_count,
+        successful_candidate_requests,
+    );
+    let candidate_route_count = unique_telemetry_values(&matched, |candidate| {
+        candidate.telemetry.route_id.as_deref()
+    })
+    .len();
+    let candidate_scheduler_policies = unique_telemetry_values(&matched, |candidate| {
+        candidate.telemetry.scheduler_policy.as_deref()
+    });
     let token_trace_pairs = matched
         .iter()
         .filter(|(baseline, candidate)| {
@@ -531,6 +578,38 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
             ),
         );
     }
+    let route_provenance_failed = input.thresholds.require_candidate_route_provenance
+        && candidate_routing_provenance_rate < 1.0;
+    if route_provenance_failed {
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "routing_provenance",
+            GateDecision::Hold,
+            "serving_runtime",
+            "collect route and scheduler provenance for every successful candidate request",
+            format!(
+                "candidate routing provenance rate {:.4}; expected complete route and scheduler coverage",
+                candidate_routing_provenance_rate
+            ),
+        );
+    }
+    let streaming_trace_failed =
+        input.thresholds.require_streaming_token_trace && candidate_streaming_trace_rate < 1.0;
+    if streaming_trace_failed {
+        add_triage(
+            &mut reasons,
+            &mut triage,
+            "streaming_token_trace",
+            GateDecision::Hold,
+            "decode_runtime",
+            "collect streaming token events before trusting decode-path rollout evidence",
+            format!(
+                "candidate streaming-token trace rate {:.4}; expected complete streaming trace coverage",
+                candidate_streaming_trace_rate
+            ),
+        );
+    }
 
     let decision = if correctness_failed || numeric_correctness_failed || reliability_failed {
         GateDecision::Rollback
@@ -540,6 +619,8 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
         || ttft_failed
         || decode_token_latency_failed
         || memory_pressure_failed
+        || route_provenance_failed
+        || streaming_trace_failed
     {
         GateDecision::Hold
     } else {
@@ -551,7 +632,7 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
     };
 
     GateReport {
-        schema_version: 3,
+        schema_version: 4,
         decision,
         matched_requests,
         baseline_requests,
@@ -577,6 +658,10 @@ pub fn evaluate_release(input: &GateInput) -> GateReport {
         decode_token_p95_regression_pct,
         max_candidate_queue_depth,
         max_candidate_memory_pressure_pct,
+        candidate_routing_provenance_rate,
+        candidate_streaming_trace_rate,
+        candidate_route_count,
+        candidate_scheduler_policies,
         token_trace_pairs,
         token_trace_mismatch_rate,
         segments: segment_reports(&matched, &matched_comparisons),
@@ -733,6 +818,11 @@ struct SegmentAccumulator {
     candidate_decode_token_latencies: Vec<f64>,
     candidate_queue_depths: Vec<usize>,
     candidate_memory_pressure_pct: Vec<f64>,
+    candidate_successes: usize,
+    candidate_routing_provenance_count: usize,
+    candidate_streaming_trace_count: usize,
+    candidate_routes: BTreeSet<String>,
+    candidate_scheduler_policies: BTreeSet<String>,
     token_trace_pairs: usize,
     token_trace_mismatches: usize,
 }
@@ -752,6 +842,21 @@ fn segment_reports(
         }
         if !candidate.ok {
             entry.candidate_errors += 1;
+        }
+        if candidate.ok {
+            entry.candidate_successes += 1;
+            if has_candidate_route_provenance(candidate) {
+                entry.candidate_routing_provenance_count += 1;
+            }
+            if has_streaming_token_trace(candidate) {
+                entry.candidate_streaming_trace_count += 1;
+            }
+            if let Some(route_id) = candidate.telemetry.route_id.as_ref() {
+                entry.candidate_routes.insert(route_id.clone());
+            }
+            if let Some(policy) = candidate.telemetry.scheduler_policy.as_ref() {
+                entry.candidate_scheduler_policies.insert(policy.clone());
+            }
         }
         if baseline.ok && candidate.ok {
             entry.output_pairs += 1;
@@ -859,6 +964,19 @@ fn segment_reports(
                         .into_iter()
                         .map(Some),
                 ),
+                candidate_routing_provenance_rate: ratio(
+                    accumulator.candidate_routing_provenance_count,
+                    accumulator.candidate_successes,
+                ),
+                candidate_streaming_trace_rate: ratio(
+                    accumulator.candidate_streaming_trace_count,
+                    accumulator.candidate_successes,
+                ),
+                candidate_route_count: accumulator.candidate_routes.len(),
+                candidate_scheduler_policies: accumulator
+                    .candidate_scheduler_policies
+                    .into_iter()
+                    .collect(),
                 token_trace_pairs: accumulator.token_trace_pairs,
                 token_trace_mismatch_rate: ratio(
                     accumulator.token_trace_mismatches,
@@ -896,6 +1014,33 @@ fn segment_key(baseline: &Observation, candidate: &Observation) -> SegmentKey {
         baseline_model_version: optional_label(&baseline.telemetry.model_version),
         candidate_model_version: optional_label(&candidate.telemetry.model_version),
     }
+}
+
+fn has_candidate_route_provenance(candidate: &Observation) -> bool {
+    has_value(&candidate.telemetry.route_id) && has_value(&candidate.telemetry.scheduler_policy)
+}
+
+fn has_streaming_token_trace(candidate: &Observation) -> bool {
+    candidate.telemetry.streamed_token_count > 0
+        && candidate.telemetry.token_trace_fingerprint.is_some()
+}
+
+fn unique_telemetry_values(
+    matched: &[(&Observation, &Observation)],
+    selector: impl Fn(&Observation) -> Option<&str>,
+) -> Vec<String> {
+    matched
+        .iter()
+        .filter_map(|(_, candidate)| selector(candidate))
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn has_value(value: &Option<String>) -> bool {
+    value.as_ref().is_some_and(|value| !value.trim().is_empty())
 }
 
 fn optional_label(value: &Option<String>) -> String {

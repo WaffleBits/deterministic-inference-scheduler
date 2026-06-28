@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "decision": "rollback",
   "matched_requests": 4,
   "baseline_requests": 4,
@@ -25,6 +25,10 @@
   "decode_token_p95_regression_pct": null,
   "max_candidate_queue_depth": null,
   "max_candidate_memory_pressure_pct": null,
+  "candidate_routing_provenance_rate": 0.0,
+  "candidate_streaming_trace_rate": 0.0,
+  "candidate_route_count": 0,
+  "candidate_scheduler_policies": [],
   "token_trace_pairs": 0,
   "token_trace_mismatch_rate": 0.0,
   "segments": [
@@ -50,6 +54,10 @@
       "decode_token_p95_regression_pct": null,
       "max_candidate_queue_depth": null,
       "max_candidate_memory_pressure_pct": null,
+      "candidate_routing_provenance_rate": 0.0,
+      "candidate_streaming_trace_rate": 0.0,
+      "candidate_route_count": 0,
+      "candidate_scheduler_policies": [],
       "token_trace_pairs": 0,
       "token_trace_mismatch_rate": 0.0
     }

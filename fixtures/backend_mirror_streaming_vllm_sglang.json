@@ -1,0 +1,167 @@
+{
+  "thresholds": {
+    "min_matched_requests": 4,
+    "max_output_mismatch_rate": 0.0,
+    "max_error_rate_increase": 0.01,
+    "max_p95_latency_regression_pct": 10.0,
+    "max_ttft_regression_pct": 10.0,
+    "max_decode_token_p95_regression_pct": 10.0,
+    "max_candidate_memory_pressure_pct": 90.0,
+    "max_numeric_drift_rate": 0.0,
+    "numeric_tolerances": [],
+    "require_candidate_route_provenance": true,
+    "require_streaming_token_trace": true
+  },
+  "baseline": {
+    "backend": "vllm",
+    "model": "decoder-7b",
+    "accelerator": "h100",
+    "observations": [
+      {
+        "request_id": "prompt-a",
+        "latency_ms": 18.0,
+        "ok": true,
+        "model_version": "decoder-7b@baseline-2026-06-28",
+        "route_id": "vllm-prefill-a",
+        "replica_id": "vllm-replica-0",
+        "scheduler_policy": "continuous-batching",
+        "queue_depth": 2,
+        "kv_pages_used": 8,
+        "kv_pages_capacity": 20,
+        "streaming_token_events": [
+          { "sequence": 0, "token_id": 101, "elapsed_ms": 6.0 },
+          { "sequence": 1, "token_id": 1402, "elapsed_ms": 10.0 },
+          { "sequence": 2, "token_id": 13, "elapsed_ms": 14.5 }
+        ]
+      },
+      {
+        "request_id": "prompt-b",
+        "latency_ms": 21.0,
+        "ok": true,
+        "model_version": "decoder-7b@baseline-2026-06-28",
+        "route_id": "vllm-prefill-a",
+        "replica_id": "vllm-replica-1",
+        "scheduler_policy": "continuous-batching",
+        "queue_depth": 3,
+        "kv_pages_used": 9,
+        "kv_pages_capacity": 20,
+        "streaming_token_events": [
+          { "sequence": 0, "token_id": 205, "elapsed_ms": 7.0 },
+          { "sequence": 1, "token_id": 778, "elapsed_ms": 12.0 },
+          { "sequence": 2, "token_id": 990, "elapsed_ms": 17.5 }
+        ]
+      },
+      {
+        "request_id": "prompt-c",
+        "latency_ms": 24.0,
+        "ok": true,
+        "model_version": "decoder-7b@baseline-2026-06-28",
+        "route_id": "vllm-prefill-b",
+        "replica_id": "vllm-replica-0",
+        "scheduler_policy": "continuous-batching",
+        "queue_depth": 4,
+        "kv_pages_used": 10,
+        "kv_pages_capacity": 20,
+        "streaming_token_events": [
+          { "sequence": 0, "token_id": 42, "elapsed_ms": 8.0 },
+          { "sequence": 1, "token_id": 42, "elapsed_ms": 14.0 },
+          { "sequence": 2, "token_id": 7, "elapsed_ms": 20.5 }
+        ]
+      },
+      {
+        "request_id": "prompt-d",
+        "latency_ms": 28.0,
+        "ok": true,
+        "model_version": "decoder-7b@baseline-2026-06-28",
+        "route_id": "vllm-prefill-b",
+        "replica_id": "vllm-replica-1",
+        "scheduler_policy": "continuous-batching",
+        "queue_depth": 5,
+        "kv_pages_used": 11,
+        "kv_pages_capacity": 20,
+        "streaming_token_events": [
+          { "sequence": 0, "token_id": 301, "elapsed_ms": 9.0 },
+          { "sequence": 1, "token_id": 302, "elapsed_ms": 15.5 },
+          { "sequence": 2, "token_id": 303, "elapsed_ms": 22.5 },
+          { "sequence": 3, "token_id": 2, "elapsed_ms": 28.0 }
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "backend": "sglang",
+    "model": "decoder-7b",
+    "accelerator": "h100",
+    "observations": [
+      {
+        "request_id": "prompt-a",
+        "latency_ms": 17.5,
+        "ok": true,
+        "model_version": "decoder-7b@candidate-2026-06-28",
+        "route_id": "sglang-prefill-a",
+        "replica_id": "sglang-replica-0",
+        "scheduler_policy": "continuous-batching",
+        "queue_depth": 3,
+        "kv_pages_used": 9,
+        "kv_pages_capacity": 20,
+        "streaming_token_events": [
+          { "sequence": 0, "token_id": 101, "elapsed_ms": 5.5 },
+          { "sequence": 1, "token_id": 1402, "elapsed_ms": 9.3 },
+          { "sequence": 2, "token_id": 13, "elapsed_ms": 13.3 }
+        ]
+      },
+      {
+        "request_id": "prompt-b",
+        "latency_ms": 20.6,
+        "ok": true,
+        "model_version": "decoder-7b@candidate-2026-06-28",
+        "route_id": "sglang-prefill-a",
+        "replica_id": "sglang-replica-1",
+        "scheduler_policy": "continuous-batching",
+        "queue_depth": 4,
+        "kv_pages_used": 10,
+        "kv_pages_capacity": 20,
+        "streaming_token_events": [
+          { "sequence": 0, "token_id": 205, "elapsed_ms": 6.5 },
+          { "sequence": 1, "token_id": 778, "elapsed_ms": 11.2 },
+          { "sequence": 2, "token_id": 990, "elapsed_ms": 16.2 }
+        ]
+      },
+      {
+        "request_id": "prompt-c",
+        "latency_ms": 23.5,
+        "ok": true,
+        "model_version": "decoder-7b@candidate-2026-06-28",
+        "route_id": "sglang-prefill-b",
+        "replica_id": "sglang-replica-0",
+        "scheduler_policy": "continuous-batching",
+        "queue_depth": 5,
+        "kv_pages_used": 11,
+        "kv_pages_capacity": 20,
+        "streaming_token_events": [
+          { "sequence": 0, "token_id": 42, "elapsed_ms": 7.5 },
+          { "sequence": 1, "token_id": 42, "elapsed_ms": 13.3 },
+          { "sequence": 2, "token_id": 7, "elapsed_ms": 19.3 }
+        ]
+      },
+      {
+        "request_id": "prompt-d",
+        "latency_ms": 27.2,
+        "ok": true,
+        "model_version": "decoder-7b@candidate-2026-06-28",
+        "route_id": "sglang-prefill-b",
+        "replica_id": "sglang-replica-1",
+        "scheduler_policy": "continuous-batching",
+        "queue_depth": 6,
+        "kv_pages_used": 12,
+        "kv_pages_capacity": 20,
+        "streaming_token_events": [
+          { "sequence": 0, "token_id": 301, "elapsed_ms": 8.5 },
+          { "sequence": 1, "token_id": 302, "elapsed_ms": 14.7 },
+          { "sequence": 2, "token_id": 303, "elapsed_ms": 21.2 },
+          { "sequence": 3, "token_id": 2, "elapsed_ms": 27.2 }
+        ]
+      }
+    ]
+  }
+}

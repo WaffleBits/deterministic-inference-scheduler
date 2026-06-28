@@ -130,6 +130,8 @@ fn promotes_candidate_with_numeric_outputs_inside_model_tolerance() {
                 max_abs_error: 0.002,
                 max_rel_error: 0.01,
             }],
+            require_candidate_route_provenance: false,
+            require_streaming_token_trace: false,
         },
         baseline: vec![
             numeric_observation("a", "baseline-a", "baseline", &[1.0, 2.0], 10.0),
@@ -171,6 +173,8 @@ fn rolls_back_numeric_outputs_outside_model_tolerance() {
                 max_abs_error: 0.002,
                 max_rel_error: 0.01,
             }],
+            require_candidate_route_provenance: false,
+            require_streaming_token_trace: false,
         },
         baseline: vec![
             numeric_observation("a", "baseline-a", "baseline", &[1.0, 2.0], 10.0),
