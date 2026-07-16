@@ -1,6 +1,6 @@
-# Rust Inference Runtime
+# Deterministic Inference Scheduler
 
-[![CI](https://github.com/WaffleBits/rust-inference-runtime/actions/workflows/ci.yml/badge.svg)](https://github.com/WaffleBits/rust-inference-runtime/actions/workflows/ci.yml)
+[![CI](https://github.com/WaffleBits/deterministic-inference-scheduler/actions/workflows/ci.yml/badge.svg)](https://github.com/WaffleBits/deterministic-inference-scheduler/actions/workflows/ci.yml)
 
 A deterministic inference runtime core in Rust. It models continuous-batching admission and paged KV-cache scheduling, records replayable traces, and runs promote/hold/rollback release gates over baseline-versus-candidate runs.
 
