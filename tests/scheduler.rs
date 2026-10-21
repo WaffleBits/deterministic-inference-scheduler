@@ -1,4 +1,7 @@
+use proptest::prelude::*;
+use proptest::test_runner::FileFailurePersistence;
 use rust_inference_runtime::{ReplayInput, RequestSpec, Scheduler, SchedulerConfig, run_replay};
+use std::collections::{BTreeMap, BTreeSet};
 
 fn config() -> SchedulerConfig {
     SchedulerConfig {
@@ -7,6 +10,157 @@ fn config() -> SchedulerConfig {
         max_prefill_tokens_per_tick: 48,
         kv_page_tokens: 16,
         total_kv_pages: 8,
+    }
+}
+
+fn generated_replay_input() -> impl Strategy<Value = ReplayInput> {
+    (
+        1u32..65,
+        1usize..9,
+        1usize..9,
+        1u32..129,
+        prop::collection::vec((1u32..513, 1u32..129, 0u8..8, 0u64..16), 0..25),
+    )
+        .prop_map(
+            |(kv_page_tokens, max_active_requests, decode_batch_size, prefill_limit, raw)| {
+                let mut total_kv_pages = 1u32;
+                let requests: Vec<RequestSpec> = raw
+                    .into_iter()
+                    .enumerate()
+                    .map(
+                        |(index, (prompt_tokens, max_output_tokens, priority, arrival_tick))| {
+                            let reserved_pages = prompt_tokens
+                                .saturating_add(max_output_tokens)
+                                .div_ceil(kv_page_tokens);
+                            total_kv_pages = total_kv_pages.max(reserved_pages);
+                            RequestSpec {
+                                id: format!("request-{index}"),
+                                prompt_tokens,
+                                max_output_tokens,
+                                priority,
+                                arrival_tick,
+                            }
+                        },
+                    )
+                    .collect();
+
+                ReplayInput {
+                    config: SchedulerConfig {
+                        max_active_requests,
+                        decode_batch_size,
+                        max_prefill_tokens_per_tick: prefill_limit,
+                        kv_page_tokens,
+                        total_kv_pages,
+                    },
+                    requests,
+                }
+            },
+        )
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig {
+        cases: 128,
+        failure_persistence: Some(Box::new(FileFailurePersistence::WithSource("proptest-regressions"))),
+        .. ProptestConfig::default()
+    })]
+
+    #[test]
+    fn generated_replays_preserve_determinism_and_accounting(input in generated_replay_input()) {
+        let requests = input.requests.clone();
+        let config = input.config.clone();
+        let report = run_replay(input.clone()).expect("generated inputs are valid");
+        let repeated = run_replay(input).expect("replay should be repeatable");
+        prop_assert_eq!(&report, &repeated);
+
+        let prompt_by_id: BTreeMap<String, u32> = requests
+            .iter()
+            .map(|request| (request.id.clone(), request.prompt_tokens))
+            .collect();
+        let expected_outputs: BTreeMap<String, u32> = requests
+            .iter()
+            .map(|request| (request.id.clone(), request.max_output_tokens))
+            .collect();
+        let expected_ids: BTreeSet<String> = requests
+            .iter()
+            .map(|request| request.id.clone())
+            .collect();
+
+        let mut admitted = Vec::new();
+        let mut completed = Vec::new();
+        let mut decoded_outputs = BTreeMap::<String, u32>::new();
+        for (index, tick) in report.ticks.iter().enumerate() {
+            prop_assert_eq!(tick.tick, index as u64);
+            prop_assert!(tick.active_requests <= config.max_active_requests);
+            prop_assert!(tick.used_kv_pages <= config.total_kv_pages);
+            prop_assert_eq!(tick.decoded_tokens as usize, tick.decoded.len());
+
+            let prefill_tokens: u32 = tick
+                .admitted
+                .iter()
+                .map(|id| *prompt_by_id.get(id).expect("admitted ID belongs to input"))
+                .sum();
+            prop_assert_eq!(tick.admitted_prefill_tokens, prefill_tokens);
+            prop_assert!(tick.completed.iter().all(|id| tick.decoded.iter().any(|decoded| decoded == id)));
+
+            admitted.extend(tick.admitted.iter().cloned());
+            completed.extend(tick.completed.iter().cloned());
+            for id in &tick.decoded {
+                *decoded_outputs.entry(id.clone()).or_default() += 1;
+            }
+
+            let arrived = requests
+                .iter()
+                .filter(|request| request.arrival_tick <= tick.tick)
+                .count();
+            let completed_so_far: usize = report.ticks[..=index]
+                .iter()
+                .map(|prior| prior.completed.len())
+                .sum();
+            prop_assert_eq!(tick.queued_requests + tick.active_requests + completed_so_far, arrived);
+        }
+
+        admitted.sort();
+        completed.sort();
+        let expected_ids: Vec<String> = expected_ids.into_iter().collect();
+        prop_assert_eq!(&admitted, &expected_ids);
+        prop_assert_eq!(&completed, &expected_ids);
+        prop_assert_eq!(decoded_outputs, expected_outputs);
+
+        let expected_prompt_tokens: u64 = requests.iter().map(|request| u64::from(request.prompt_tokens)).sum();
+        let expected_decode_tokens: u64 = requests.iter().map(|request| u64::from(request.max_output_tokens)).sum();
+        let expected_reserved_pages: u64 = requests
+            .iter()
+            .map(|request| {
+                u64::from(
+                    request
+                        .prompt_tokens
+                        .saturating_add(request.max_output_tokens)
+                        .div_ceil(config.kv_page_tokens),
+                )
+            })
+            .sum();
+
+        prop_assert_eq!(report.request_count, requests.len());
+        prop_assert_eq!(report.completed_requests, requests.len());
+        prop_assert_eq!(report.total_prompt_tokens, expected_prompt_tokens);
+        prop_assert_eq!(report.total_decode_tokens, expected_decode_tokens);
+        prop_assert_eq!(report.total_reserved_kv_pages, expected_reserved_pages);
+        prop_assert_eq!(report.total_ticks, report.ticks.len() as u64);
+        prop_assert_eq!(report.final_kv_pages, 0);
+        prop_assert_eq!(
+            report.peak_kv_pages,
+            report.ticks.iter().map(|tick| tick.used_kv_pages).max().unwrap_or(0)
+        );
+        prop_assert_eq!(
+            report.max_queued_requests,
+            report.ticks.iter().map(|tick| tick.queued_requests).max().unwrap_or(0)
+        );
+        prop_assert_eq!(
+            report.max_active_requests,
+            report.ticks.iter().map(|tick| tick.active_requests).max().unwrap_or(0)
+        );
+        prop_assert!(report.max_active_requests <= config.max_active_requests);
     }
 }
 
