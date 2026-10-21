@@ -42,6 +42,19 @@ Each request declares prompt length, maximum output length, priority, and arriva
 
 Every tick records admitted and decoded request IDs, admitted prefill tokens, decoded token count, queued and active counts, and used KV pages. The replay report rolls these up into a trace fingerprint, peak KV usage, queue and active pressure, token totals, utilization ratios, and completion count.
 
+## Property-tested invariants
+
+`cargo test --all-targets` also runs 128 bounded property cases over generated,
+valid synthetic scheduler configurations and request sets. The test checks
+identical replay reports, per-request admission/completion/decode accounting,
+trace counters, queue/active state reconciliation, active-request and KV-page
+limits, and final KV release. Proptest shrinks counterexamples and persists any
+failure seed beside the integration test for replay.
+
+These generated fixtures broaden coverage of the scheduler model; they are not
+production traces, a workload-fidelity claim, GPU execution, performance
+measurements, or proof of all possible scheduler states.
+
 ## Replay summary
 
 Running the workload fixture writes `artifacts/workload-replay.json`. The top of that report is what a reviewer looks at first: the aggregate outcome of scheduling four requests, before the per-tick detail.
