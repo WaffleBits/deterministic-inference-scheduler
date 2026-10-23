@@ -29,9 +29,11 @@ fn generated_replay_input() -> impl Strategy<Value = ReplayInput> {
                     .enumerate()
                     .map(
                         |(index, (prompt_tokens, max_output_tokens, priority, arrival_tick))| {
-                            let reserved_pages = prompt_tokens
-                                .saturating_add(max_output_tokens)
-                                .div_ceil(kv_page_tokens);
+                            let reserved_pages = u32::try_from(
+                                (u64::from(prompt_tokens) + u64::from(max_output_tokens))
+                                    .div_ceil(u64::from(kv_page_tokens)),
+                            )
+                            .expect("bounded generated tokens fit in the page counter");
                             total_kv_pages = total_kv_pages.max(reserved_pages);
                             RequestSpec {
                                 id: format!("request-{index}"),
@@ -132,12 +134,8 @@ proptest! {
         let expected_reserved_pages: u64 = requests
             .iter()
             .map(|request| {
-                u64::from(
-                    request
-                        .prompt_tokens
-                        .saturating_add(request.max_output_tokens)
-                        .div_ceil(config.kv_page_tokens),
-                )
+                (u64::from(request.prompt_tokens) + u64::from(request.max_output_tokens))
+                    .div_ceil(u64::from(config.kv_page_tokens))
             })
             .sum();
 
@@ -243,6 +241,66 @@ fn kv_reservations_prevent_overcommit_and_release_on_completion() {
         assert!(tick.used_kv_pages <= 4);
     }
     assert!(scheduler.is_idle());
+}
+
+#[test]
+fn rejects_kv_reservation_whose_token_sum_exceeds_u32() {
+    let mut scheduler = Scheduler::new(SchedulerConfig {
+        max_active_requests: 1,
+        decode_batch_size: 1,
+        max_prefill_tokens_per_tick: u32::MAX,
+        kv_page_tokens: 1,
+        total_kv_pages: u32::MAX,
+    })
+    .unwrap();
+
+    let error = scheduler
+        .submit(RequestSpec {
+            id: "overflowing-reservation".into(),
+            prompt_tokens: u32::MAX,
+            max_output_tokens: 1,
+            priority: 0,
+            arrival_tick: 0,
+        })
+        .unwrap_err();
+
+    assert!(error.to_string().contains("requires more KV pages"));
+}
+
+#[test]
+fn kv_capacity_check_does_not_admit_a_request_past_u32_capacity() {
+    let mut scheduler = Scheduler::new(SchedulerConfig {
+        max_active_requests: 2,
+        decode_batch_size: 1,
+        max_prefill_tokens_per_tick: u32::MAX,
+        kv_page_tokens: 1,
+        total_kv_pages: u32::MAX,
+    })
+    .unwrap();
+    for id in ["first", "second"] {
+        scheduler
+            .submit(RequestSpec {
+                id: id.into(),
+                prompt_tokens: 2_147_483_647,
+                max_output_tokens: 2,
+                priority: 0,
+                arrival_tick: 0,
+            })
+            .unwrap();
+    }
+
+    let first_tick = scheduler.step();
+    assert_eq!(first_tick.admitted, vec!["first"]);
+    assert_eq!(first_tick.used_kv_pages, 2_147_483_649);
+
+    let second_tick = scheduler.step();
+    assert!(second_tick.admitted.is_empty());
+    assert_eq!(second_tick.queued_requests, 1);
+    assert_eq!(second_tick.used_kv_pages, 0);
+
+    let third_tick = scheduler.step();
+    assert_eq!(third_tick.admitted, vec!["second"]);
+    assert_eq!(third_tick.used_kv_pages, 2_147_483_649);
 }
 
 #[test]

@@ -66,7 +66,7 @@ impl RequestSpec {
                 self.id
             )));
         }
-        if self.reserved_pages(config.kv_page_tokens) > config.total_kv_pages {
+        if self.reserved_pages(config.kv_page_tokens) > u64::from(config.total_kv_pages) {
             return Err(RuntimeError::InvalidRequest(format!(
                 "{} requires more KV pages than the runtime owns",
                 self.id
@@ -75,10 +75,9 @@ impl RequestSpec {
         Ok(())
     }
 
-    fn reserved_pages(&self, page_tokens: u32) -> u32 {
-        self.prompt_tokens
-            .saturating_add(self.max_output_tokens)
-            .div_ceil(page_tokens)
+    fn reserved_pages(&self, page_tokens: u32) -> u64 {
+        (u64::from(self.prompt_tokens) + u64::from(self.max_output_tokens))
+            .div_ceil(u64::from(page_tokens))
     }
 }
 
@@ -215,8 +214,12 @@ impl Scheduler {
             let Some(candidate) = self.queue.pop() else {
                 break;
             };
-            let pages = candidate.spec.reserved_pages(self.config.kv_page_tokens);
-            let pages_fit = self.used_kv_pages.saturating_add(pages) <= self.config.total_kv_pages;
+            let pages = u32::try_from(candidate.spec.reserved_pages(self.config.kv_page_tokens))
+                .expect("submitted requests were validated against KV capacity");
+            let pages_fit = self
+                .used_kv_pages
+                .checked_add(pages)
+                .is_some_and(|used_pages| used_pages <= self.config.total_kv_pages);
             let prefill_fits = candidate.spec.prompt_tokens <= remaining_prefill
                 || (admitted.is_empty()
                     && remaining_prefill == self.config.max_prefill_tokens_per_tick);
@@ -328,7 +331,7 @@ pub fn run_replay(input: ReplayInput) -> Result<ReplayReport, RuntimeError> {
         .sum();
     let total_reserved_kv_pages = pending
         .iter()
-        .map(|(_, request)| u64::from(request.reserved_pages(input.config.kv_page_tokens)))
+        .map(|(_, request)| request.reserved_pages(input.config.kv_page_tokens))
         .sum();
     pending.sort_by(|(left_index, left), (right_index, right)| {
         left.arrival_tick
