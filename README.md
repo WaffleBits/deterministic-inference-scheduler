@@ -9,7 +9,7 @@ Everything runs on synthetic fixtures. No GPU, no model weights, no accelerator 
 ## What it does
 
 - Priority-aware admission with stable ordering and bounded prefill work.
-- Conservative paged-KV reservations that keep admitted requests within capacity.
+- Conservative paged-KV reservations that keep admitted requests within capacity, including integer-boundary inputs.
 - Round-robin decode scheduling so active requests make progress.
 - Deterministic replay with a stable trace fingerprint and pressure summaries.
 - Release gates with `promote`, `hold`, and `rollback` outcomes.
@@ -50,6 +50,11 @@ identical replay reports, per-request admission/completion/decode accounting,
 trace counters, queue/active state reconciliation, active-request and KV-page
 limits, and final KV release. Proptest shrinks counterexamples and persists any
 failure seed beside the integration test for replay.
+
+Prompt and output token counts are widened before KV-page rounding, and the
+capacity check uses checked addition. Regression tests cover requests near the
+`u32` limits so arithmetic overflow cannot turn a capacity violation into an
+admission.
 
 These generated fixtures broaden coverage of the scheduler model; they are not
 production traces, a workload-fidelity claim, GPU execution, performance
