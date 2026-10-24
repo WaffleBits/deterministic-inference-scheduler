@@ -47,9 +47,12 @@ The target repository already has `Cargo.lock`, deterministic scheduling/replay,
 - `actionlint` and `git diff --check` pass.
 - Canonical project checks ran in the cached `rust:1-bookworm` image (Rust/Cargo 1.99.1): `cargo fmt --all --check`, `cargo clippy --all-targets --all-features -- -D warnings`, and `cargo test --all-targets` passed. The integration suites reported 7 adapter, 5 release, and 7 scheduler tests passing (19 total, including 128 generated cases).
 - Release CLI fixtures ran successfully. Parsed outputs confirmed replay completed 4/4 requests and returned all KV pages; the safe gate returned `promote`, the bad gate returned `rollback`, and the numeric-tolerance gate returned `promote`.
-- **Local audit limitation:** I started the exact `cargo install --locked cargo-audit --version 0.22.2` path in the Rust container, but compilation was still in progress after 7m35s and the host had about 891 MB free. I stopped only that temporary build to avoid exhausting this nearly full host. No local `cargo audit` success is claimed. The pushed PR's GitHub CI must pass the installed tool and audit command before merge; otherwise the workflow will be corrected or the change left unmerged.
+- **Local audit limitation:** the local `cargo install --locked cargo-audit --version 0.22.2` build was still compiling after 7m35s with under 1 GB available, so I stopped only that temporary build to protect host capacity. No local audit success is claimed. The PR's GitHub CI subsequently installed the same tool and successfully ran `cargo audit --file Cargo.lock`; this is the verified audit result.
 - No profile/resume claims or production-scale claims changed. Rust build outputs are outside the repository in `/tmp`.
 
-## Pull request and publication results
+## Pull request verification
 
-_To be completed after GitHub Actions and merge/read-back verification._
+- Pull request [#8](https://github.com/WaffleBits/deterministic-inference-scheduler/pull/8) was opened from `security/scheduler-supply-chain-20261024` at implementation commit `ee9452b11bce764eae0a7486084c3f50d863b747`.
+- Its CI run [40089444467](https://github.com/WaffleBits/deterministic-inference-scheduler/actions/runs/40089444467) passed in 2m30s. GitHub read-back confirms the policy test, pinned action steps, `cargo-audit` installation, audit, formatting, Clippy, tests, replay fixture, and release-gate fixtures all succeeded.
+- The audit step fetched the RustSec database (1,352 advisories) and scanned the 28 dependency entries in `Cargo.lock`; the step exited successfully. The log did not emit an explicit vulnerability count, so none is asserted here.
+- PR #8 remains open and unmerged at this run's end. Its tested feature-branch commit and CI are public, but `main` is unchanged and there is no post-merge workflow result to report. No profile/resume claims were published or changed.
