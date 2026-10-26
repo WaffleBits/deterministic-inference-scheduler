@@ -14,6 +14,12 @@ pub struct SchedulerConfig {
     pub max_prefill_tokens_per_tick: u32,
     pub kv_page_tokens: u32,
     pub total_kv_pages: u32,
+    #[serde(default = "default_priority_aging_interval_ticks")]
+    pub priority_aging_interval_ticks: u64,
+}
+
+fn default_priority_aging_interval_ticks() -> u64 {
+    32
 }
 
 impl SchedulerConfig {
@@ -31,6 +37,11 @@ impl SchedulerConfig {
         if self.max_prefill_tokens_per_tick == 0 {
             return Err(RuntimeError::InvalidConfig(
                 "max_prefill_tokens_per_tick must be greater than zero".into(),
+            ));
+        }
+        if self.priority_aging_interval_ticks == 0 {
+            return Err(RuntimeError::InvalidConfig(
+                "priority_aging_interval_ticks must be greater than zero".into(),
             ));
         }
         if self.kv_page_tokens == 0 || self.total_kv_pages == 0 {
@@ -85,13 +96,13 @@ impl RequestSpec {
 struct QueuedRequest {
     spec: RequestSpec,
     sequence: u64,
+    effective_priority: u8,
 }
 
 impl Ord for QueuedRequest {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.spec
-            .priority
-            .cmp(&other.spec.priority)
+        self.effective_priority
+            .cmp(&other.effective_priority)
             .then_with(|| other.sequence.cmp(&self.sequence))
             .then_with(|| other.spec.id.cmp(&self.spec.id))
     }
@@ -161,9 +172,11 @@ impl Scheduler {
         if !self.known_ids.insert(spec.id.clone()) {
             return Err(RuntimeError::DuplicateRequest(spec.id));
         }
+        let effective_priority = spec.priority;
         self.queue.push(QueuedRequest {
             spec,
             sequence: self.sequence,
+            effective_priority,
         });
         self.sequence += 1;
         Ok(())
@@ -201,6 +214,7 @@ impl Scheduler {
     }
 
     fn admit_requests(&mut self, admitted: &mut Vec<String>) -> u32 {
+        self.refresh_queue_priorities();
         let mut remaining_prefill = self.config.max_prefill_tokens_per_tick;
         let mut deferred = Vec::new();
         let candidates = self.queue.len();
@@ -246,6 +260,22 @@ impl Scheduler {
 
         self.queue.extend(deferred);
         admitted_prefill_tokens
+    }
+
+    fn refresh_queue_priorities(&mut self) {
+        let now = self.tick;
+        let aging_interval = self.config.priority_aging_interval_ticks;
+        let queued = self
+            .queue
+            .drain()
+            .map(|mut request| {
+                let age_levels = (now.saturating_sub(request.spec.arrival_tick) / aging_interval)
+                    .min(u64::from(u8::MAX));
+                request.effective_priority = request.spec.priority.saturating_add(age_levels as u8);
+                request
+            })
+            .collect::<Vec<_>>();
+        self.queue.extend(queued);
     }
 
     fn decode_requests(&mut self, decoded: &mut Vec<String>, completed: &mut Vec<String>) -> u32 {
@@ -389,7 +419,7 @@ pub fn run_replay(input: ReplayInput) -> Result<ReplayReport, RuntimeError> {
         .map_err(|error| RuntimeError::Serialization(error.to_string()))?;
 
     Ok(ReplayReport {
-        schema_version: 3,
+        schema_version: 4,
         config: input.config,
         request_count,
         completed_requests: scheduler.completed_count(),
