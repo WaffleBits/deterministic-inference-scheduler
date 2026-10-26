@@ -6,7 +6,7 @@ The repository separates scheduling behavior from release policy.
 
 `Scheduler` owns:
 
-- a priority queue ordered by priority and stable arrival sequence;
+- a priority queue ordered by effective priority and stable submission sequence, with configurable waiting-time aging;
 - a conservative paged-KV reservation model;
 - a bounded prefill budget;
 - a round-robin decode queue; and
@@ -16,7 +16,12 @@ Requests reserve enough KV pages for the prompt and declared maximum output.
 This policy trades utilization for a simple invariant: an admitted request
 cannot fail later because its declared decode length exhausts the runtime's KV
 budget. Requests that do not fit remain queued while smaller requests may
-proceed, avoiding strict head-of-line blocking.
+proceed, avoiding strict head-of-line blocking. At each admission tick, queued
+requests gain one effective-priority point for each configured aging interval
+(default: 32 ticks), capped at the maximum `u8` priority. Stable submission
+sequence breaks ties, so older work is preferred after priorities converge.
+The controlled replay fixture demonstrates this policy with synthetic arrivals;
+it does not establish a production latency bound.
 
 The scheduler is deliberately accelerator-agnostic. A production runtime would
 connect each trace step to backend-specific kernels, streams, memory managers,

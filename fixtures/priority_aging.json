@@ -1,0 +1,110 @@
+{
+  "config": {
+    "max_active_requests": 1,
+    "decode_batch_size": 1,
+    "max_prefill_tokens_per_tick": 128,
+    "kv_page_tokens": 16,
+    "total_kv_pages": 8,
+    "priority_aging_interval_ticks": 1
+  },
+  "requests": [
+    {
+      "id": "low-priority",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 0,
+      "arrival_tick": 0
+    },
+    {
+      "id": "initial-high-priority",
+      "prompt_tokens": 1,
+      "max_output_tokens": 4,
+      "priority": 10,
+      "arrival_tick": 0
+    },
+    {
+      "id": "high-arrival-01",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 1
+    },
+    {
+      "id": "high-arrival-02",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 2
+    },
+    {
+      "id": "high-arrival-03",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 3
+    },
+    {
+      "id": "high-arrival-04",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 4
+    },
+    {
+      "id": "high-arrival-05",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 5
+    },
+    {
+      "id": "high-arrival-06",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 6
+    },
+    {
+      "id": "high-arrival-07",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 7
+    },
+    {
+      "id": "high-arrival-08",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 8
+    },
+    {
+      "id": "high-arrival-09",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 9
+    },
+    {
+      "id": "high-arrival-10",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 10
+    },
+    {
+      "id": "high-arrival-11",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 11
+    },
+    {
+      "id": "high-arrival-12",
+      "prompt_tokens": 1,
+      "max_output_tokens": 1,
+      "priority": 1,
+      "arrival_tick": 12
+    }
+  ]
+}

@@ -30,6 +30,10 @@ jobs:
         run: cargo test --all-targets
       - name: Replay fixture
         run: cargo run --release -- replay --input fixtures/workload.json --output target/workload-replay.json
+      - name: Priority-aging replay fixture
+        run: |
+          cargo run --release -- replay --input fixtures/priority_aging.json --output target/priority-aging.json
+          python3 tests/validate_priority_aging.py fixtures/priority_aging.json target/priority-aging.json
       - name: Release gate fixtures
         run: |
           cargo run --release -- gate --input fixtures/release_gate_safe.json --output target/release-gate-promote.json

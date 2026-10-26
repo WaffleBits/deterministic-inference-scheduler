@@ -10,6 +10,7 @@ fn config() -> SchedulerConfig {
         max_prefill_tokens_per_tick: 48,
         kv_page_tokens: 16,
         total_kv_pages: 8,
+        priority_aging_interval_ticks: 32,
     }
 }
 
@@ -53,6 +54,7 @@ fn generated_replay_input() -> impl Strategy<Value = ReplayInput> {
                         max_prefill_tokens_per_tick: prefill_limit,
                         kv_page_tokens,
                         total_kv_pages,
+                        priority_aging_interval_ticks: 32,
                     },
                     requests,
                 }
@@ -190,7 +192,7 @@ fn replay_is_deterministic() {
     assert_eq!(first, second);
     assert_eq!(first.ticks[0].admitted, vec!["urgent", "normal"]);
     assert_eq!(first.completed_requests, 2);
-    assert_eq!(first.schema_version, 3);
+    assert_eq!(first.schema_version, 4);
     assert_eq!(first.total_prompt_tokens, 48);
     assert_eq!(first.total_decode_tokens, 5);
     assert_eq!(first.total_reserved_kv_pages, 5);
@@ -216,6 +218,7 @@ fn kv_reservations_prevent_overcommit_and_release_on_completion() {
         max_prefill_tokens_per_tick: 128,
         kv_page_tokens: 16,
         total_kv_pages: 4,
+        priority_aging_interval_ticks: 32,
     })
     .unwrap();
 
@@ -251,6 +254,7 @@ fn rejects_kv_reservation_whose_token_sum_exceeds_u32() {
         max_prefill_tokens_per_tick: u32::MAX,
         kv_page_tokens: 1,
         total_kv_pages: u32::MAX,
+        priority_aging_interval_ticks: 32,
     })
     .unwrap();
 
@@ -275,6 +279,7 @@ fn kv_capacity_check_does_not_admit_a_request_past_u32_capacity() {
         max_prefill_tokens_per_tick: u32::MAX,
         kv_page_tokens: 1,
         total_kv_pages: u32::MAX,
+        priority_aging_interval_ticks: 32,
     })
     .unwrap();
     for id in ["first", "second"] {
@@ -311,6 +316,7 @@ fn round_robin_decode_prevents_active_request_starvation() {
         max_prefill_tokens_per_tick: 128,
         kv_page_tokens: 16,
         total_kv_pages: 16,
+        priority_aging_interval_ticks: 32,
     })
     .unwrap();
 
@@ -337,7 +343,7 @@ fn pressure_replay_reports_queue_and_capacity_summary() {
 
     let report = run_replay(input).unwrap();
 
-    assert_eq!(report.schema_version, 3);
+    assert_eq!(report.schema_version, 4);
     assert_eq!(report.request_count, report.completed_requests);
     assert_eq!(report.total_prompt_tokens, 432);
     assert_eq!(report.total_decode_tokens, 48);
@@ -356,4 +362,52 @@ fn pressure_replay_reports_queue_and_capacity_summary() {
     assert!(report.decode_capacity_utilization > 0.0);
     assert!(report.kv_page_occupancy_ratio > 0.0);
     assert_eq!(report.final_kv_pages, 0);
+}
+
+#[test]
+fn priority_aging_admits_an_older_low_priority_request_during_continuing_arrivals() {
+    let input: ReplayInput =
+        serde_json::from_str(include_str!("../fixtures/priority_aging.json")).unwrap();
+    let low_priority_value = input
+        .requests
+        .iter()
+        .find(|request| request.id == "low-priority")
+        .unwrap()
+        .priority;
+    let last_higher_priority_arrival = input
+        .requests
+        .iter()
+        .filter(|request| request.priority > low_priority_value)
+        .map(|request| request.arrival_tick)
+        .max()
+        .unwrap();
+
+    let report = run_replay(input).unwrap();
+    let low_priority_admission_tick = report
+        .ticks
+        .iter()
+        .find(|tick| tick.admitted.iter().any(|id| id == "low-priority"))
+        .map(|tick| tick.tick)
+        .expect("low-priority request must be admitted");
+
+    assert!(low_priority_admission_tick < last_higher_priority_arrival);
+    assert_eq!(low_priority_admission_tick, 4);
+}
+
+#[test]
+fn legacy_replay_config_uses_the_priority_aging_default() {
+    let input: ReplayInput = serde_json::from_str(include_str!("../fixtures/workload.json"))
+        .expect("legacy fixtures without an aging setting remain readable");
+
+    assert_eq!(input.config.priority_aging_interval_ticks, 32);
+}
+
+#[test]
+fn rejects_zero_priority_aging_interval() {
+    let mut invalid_config = config();
+    invalid_config.priority_aging_interval_ticks = 0;
+
+    let error = Scheduler::new(invalid_config).unwrap_err();
+
+    assert!(error.to_string().contains("priority_aging_interval_ticks"));
 }

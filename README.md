@@ -8,7 +8,7 @@ Everything runs on synthetic fixtures. No GPU, no model weights, no accelerator 
 
 ## What it does
 
-- Priority-aware admission with stable ordering and bounded prefill work.
+- Priority-aware admission with stable ordering, configurable priority aging, and bounded prefill work.
 - Conservative paged-KV reservations that keep admitted requests within capacity, including integer-boundary inputs.
 - Round-robin decode scheduling so active requests make progress.
 - Deterministic replay with a stable trace fingerprint and pressure summaries.
@@ -39,6 +39,8 @@ The safe fixture produces `promote`. The candidate with an output mismatch and a
 ## Runtime model
 
 Each request declares prompt length, maximum output length, priority, and arrival tick. Admission reserves paged KV capacity for the declared context, applies a per-tick prefill budget, and avoids strict head-of-line blocking when a large request cannot fit. Active requests decode round-robin with a configurable batch width.
+
+Queued requests gain one effective-priority point for every `priority_aging_interval_ticks` of waiting (default: 32 ticks), capped at the priority maximum. Original submission order breaks ties. The synthetic priority-aging fixture verifies that an older low-priority request is admitted while higher-priority work is still arriving; it is a policy test, not a production latency measurement.
 
 Every tick records admitted and decoded request IDs, admitted prefill tokens, decoded token count, queued and active counts, and used KV pages. The replay report rolls these up into a trace fingerprint, peak KV usage, queue and active pressure, token totals, utilization ratios, and completion count.
 
