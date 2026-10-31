@@ -1,3 +1,6 @@
 /target/
 *.tmp
 
+
+# Working notes live outside this repository
+docs/plans/
